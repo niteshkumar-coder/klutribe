@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script>
+      (function () {
+        try {
+          var desc = Object.getOwnPropertyDescriptor(window, 'fetch');
+          if (!desc || desc.configurable) {
+            var currentFetch = window.fetch;
+            if (typeof currentFetch === 'function') {
+              Object.defineProperty(window, 'fetch', {
+                configurable: true,
+                enumerable: true,
+                get: function () { return currentFetch; },
+                set: function (next) {
+                  if (typeof next === 'function') currentFetch = next;
+                }
+              });
+            }
+          }
+        } catch (e) {}
+
+        window.addEventListener(
+          'error',
+          function (event) {
+            var filename = event && event.filename ? event.filename : '';
+            var stack = event && event.error && event.error.stack ? event.error.stack : '';
+            var msg = event && event.message ? event.message : '';
+            if (
+              filename.indexOf('chrome-extension://') === 0 ||
+              filename.indexOf('moz-extension://') === 0 ||
+              stack.indexOf('chrome-extension://') !== -1 ||
+              msg.indexOf('Cannot set property fetch of #<Window>') !== -1
+            ) {
+              event.preventDefault();
+              event.stopImmediatePropagation();
+            }
+          },
+          true
+        );
+      })();
+    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/assets/klu-tribe-logo-light.png?v=3" />
+    <title>KLU TRIBE — KL University B.Tech Community</title>
+    <meta name="description" content="Exclusive B.Tech student network, digital tribe pass, startup idea board, and career ecosystem for KL University." />
+    <meta property="og:title" content="KLU TRIBE — KL University B.Tech Community" />
+    <meta property="og:description" content="Exclusive B.Tech student network, digital tribe pass, startup idea board, and career ecosystem for KL University." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

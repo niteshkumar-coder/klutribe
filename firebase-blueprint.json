@@ -1,0 +1,265 @@
+{
+  "entities": {
+    "StudentPublic": {
+      "title": "StudentPublic",
+      "description": "Public-safe B.Tech student profile without PII (no email, phone, gender, or full KLU ID).",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberNumber": { "type": "string", "minLength": 5, "maxLength": 20, "pattern": "^KLU-[0-9]{6}$" },
+        "maskedStudentId": { "type": "string", "minLength": 4, "maxLength": 20 },
+        "fullName": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "branch": { "type": "string", "enum": ["CSE", "AI&DS", "CS&IT", "ECE", "EEE", "ME", "CE", "BT"] },
+        "year": { "type": "string", "enum": ["1st Year", "2nd Year", "3rd Year", "4th Year"] },
+        "batch": { "type": "string", "minLength": 4, "maxLength": 20 },
+        "primaryCategory": { "type": "string", "enum": ["corporate-architect", "strategic-builder", "campus-maverick", "day1-hustler", "wildcard"] },
+        "secondaryInterests": { "type": "array" },
+        "skills": { "type": "array" },
+        "bio": { "type": "string", "maxLength": 500 },
+        "careerGoal": { "type": "string", "maxLength": 200 },
+        "startupInterest": { "type": "boolean" },
+        "startupIdeaSummary": { "type": "string", "maxLength": 280 },
+        "campusMode": { "type": "string", "enum": ["", "Hosteller", "Day Scholar"] },
+        "verificationStatus": { "type": "string", "enum": ["pending_review", "verified", "rejected"] },
+        "isSuspended": { "type": "boolean" },
+        "allowConnections": { "type": "boolean" },
+        "roadmap": { "type": "array" },
+        "categoryUpdatedAtMs": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "memberNumber", "maskedStudentId", "fullName", "branch", "year", "batch", "primaryCategory", "secondaryInterests", "skills", "bio", "careerGoal", "startupInterest", "startupIdeaSummary", "campusMode", "verificationStatus", "isSuspended", "allowConnections", "roadmap", "categoryUpdatedAtMs", "createdAt", "updatedAt"]
+    },
+    "StudentPrivate": {
+      "title": "StudentPrivate",
+      "description": "Strictly isolated student PII accessible only to the owning student or verified admins.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "phone": { "type": "string", "minLength": 10, "maxLength": 16 },
+        "kluStudentId": { "type": "string", "minLength": 6, "maxLength": 20 },
+        "gender": { "type": "string", "enum": ["", "Male", "Female", "Non-binary", "Prefer not to say"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "phone", "kluStudentId", "gender", "createdAt", "updatedAt"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Authorized platform administrator record.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "email": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
+    "Connection": {
+      "title": "Connection",
+      "description": "Mutual networking connection between two verified students.",
+      "type": "object",
+      "properties": {
+        "fromUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "toUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "fromName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "toName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "participantUids": { "type": "array" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined"] },
+        "note": { "type": "string", "maxLength": 240 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fromUid", "toUid", "fromName", "toName", "participantUids", "status", "note", "createdAt", "updatedAt"]
+    },
+    "DirectMessage": {
+      "title": "DirectMessage",
+      "description": "Private message inside an accepted mutual connection.",
+      "type": "object",
+      "properties": {
+        "senderUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "senderName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "body": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderUid", "senderName", "body", "createdAt"]
+    },
+    "StartupIdea": {
+      "title": "StartupIdea",
+      "description": "Student startup idea and co-founder matching entry.",
+      "type": "object",
+      "properties": {
+        "authorUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "authorName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "authorBranch": { "type": "string", "minLength": 2, "maxLength": 20 },
+        "title": { "type": "string", "minLength": 3, "maxLength": 100 },
+        "description": { "type": "string", "minLength": 10, "maxLength": 800 },
+        "problem": { "type": "string", "minLength": 5, "maxLength": 400 },
+        "solution": { "type": "string", "minLength": 5, "maxLength": 400 },
+        "stage": { "type": "string", "enum": ["Concept", "Validation", "Prototype", "MVP", "Launched"] },
+        "requiredSkills": { "type": "array" },
+        "rolesNeeded": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "visibility": { "type": "string", "enum": ["public", "private"] },
+        "interestedUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorUid", "authorName", "authorBranch", "title", "description", "problem", "solution", "stage", "requiredSkills", "rolesNeeded", "visibility", "interestedUids", "createdAt", "updatedAt"]
+    },
+    "SkillExchange": {
+      "title": "SkillExchange",
+      "description": "Peer-to-peer skill swap listing.",
+      "type": "object",
+      "properties": {
+        "authorUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "authorName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "authorBranch": { "type": "string", "minLength": 2, "maxLength": 20 },
+        "teachSkill": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "learnSkill": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "note": { "type": "string", "maxLength": 300 },
+        "status": { "type": "string", "enum": ["open", "matched", "closed"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorUid", "authorName", "authorBranch", "teachSkill", "learnSkill", "note", "status", "createdAt", "updatedAt"]
+    },
+    "ProjectTeam": {
+      "title": "ProjectTeam",
+      "description": "Student project and hackathon team formation post.",
+      "type": "object",
+      "properties": {
+        "authorUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "authorName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "title": { "type": "string", "minLength": 3, "maxLength": 100 },
+        "description": { "type": "string", "minLength": 10, "maxLength": 600 },
+        "techStack": { "type": "array" },
+        "openRoles": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "githubUrl": { "type": "string", "maxLength": 240 },
+        "portfolioUrl": { "type": "string", "maxLength": 240 },
+        "isHackathonTeam": { "type": "boolean" },
+        "memberUids": { "type": "array" },
+        "status": { "type": "string", "enum": ["recruiting", "active", "completed"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorUid", "authorName", "title", "description", "techStack", "openRoles", "githubUrl", "portfolioUrl", "isHackathonTeam", "memberUids", "status", "createdAt", "updatedAt"]
+    },
+    "Opportunity": {
+      "title": "Opportunity",
+      "description": "Curated internship, job, hackathon, scholarship, or startup opportunity requiring admin approval.",
+      "type": "object",
+      "properties": {
+        "submittedByUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "submittedByName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "title": { "type": "string", "minLength": 3, "maxLength": 120 },
+        "organization": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "category": { "type": "string", "enum": ["Internship", "Part-Time", "Freelancing", "Hackathon", "Competition", "Scholarship", "Placement Prep", "Startup Program"] },
+        "source": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "eligibility": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "deadline": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "applyUrl": { "type": "string", "minLength": 8, "maxLength": 300 },
+        "approvalStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["submittedByUid", "submittedByName", "title", "organization", "category", "source", "eligibility", "deadline", "applyUrl", "approvalStatus", "createdAt", "updatedAt"]
+    },
+    "CampusEvent": {
+      "title": "CampusEvent",
+      "description": "KL University campus event, club meet, Samyak/Surabhi activity, or sports update.",
+      "type": "object",
+      "properties": {
+        "createdByUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "title": { "type": "string", "minLength": 3, "maxLength": 120 },
+        "section": { "type": "string", "enum": ["Samyak", "Surabhi", "Clubs", "Sports", "Events", "Achievements", "Weekend"] },
+        "dateLabel": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "venue": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "description": { "type": "string", "minLength": 10, "maxLength": 600 },
+        "attendeeUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["createdByUid", "title", "section", "dateLabel", "venue", "description", "attendeeUids", "createdAt", "updatedAt"]
+    },
+    "ContentReport": {
+      "title": "ContentReport",
+      "description": "User report for suspicious job listings, fake accounts, or policy violations.",
+      "type": "object",
+      "properties": {
+        "reporterUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "targetType": { "type": "string", "enum": ["opportunity", "student", "idea", "project"] },
+        "targetId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "reason": { "type": "string", "minLength": 5, "maxLength": 400 },
+        "status": { "type": "string", "enum": ["open", "resolved", "dismissed"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["reporterUid", "targetType", "targetId", "reason", "status", "createdAt", "updatedAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable administrative audit log entry.",
+      "type": "object",
+      "properties": {
+        "adminUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "adminEmail": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "action": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "targetId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "details": { "type": "string", "minLength": 2, "maxLength": 300 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["adminUid", "adminEmail", "action", "targetId", "details", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": { "$ref": "#/entities/StudentPublic" },
+      "description": "Public-safe student directory profiles and tribe pass metadata."
+    },
+    "/students/{studentId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/StudentPrivate" },
+      "description": "Isolated PII document containing email, mobile number, gender, and full KLU Student ID."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Authorized admin UIDs for backend RBAC."
+    },
+    "/connections/{connectionId}": {
+      "schema": { "$ref": "#/entities/Connection" },
+      "description": "Peer connection requests and accepted networking links."
+    },
+    "/connections/{connectionId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/DirectMessage" },
+      "description": "Direct messages accessible only after mutual connection acceptance."
+    },
+    "/ideas/{ideaId}": {
+      "schema": { "$ref": "#/entities/StartupIdea" },
+      "description": "Startup ideas and co-founder matching posts."
+    },
+    "/skillExchanges/{exchangeId}": {
+      "schema": { "$ref": "#/entities/SkillExchange" },
+      "description": "Peer skill exchange offers and requests."
+    },
+    "/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/ProjectTeam" },
+      "description": "Student project collaboration and hackathon team posts."
+    },
+    "/opportunities/{opportunityId}": {
+      "schema": { "$ref": "#/entities/Opportunity" },
+      "description": "Internships, jobs, hackathons, and startup programs moderated by admins."
+    },
+    "/campusEvents/{eventId}": {
+      "schema": { "$ref": "#/entities/CampusEvent" },
+      "description": "KL University campus activities, clubs, and fest participation."
+    },
+    "/reports/{reportId}": {
+      "schema": { "$ref": "#/entities/ContentReport" },
+      "description": "Moderation reports submitted by verified students."
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Immutable administrative action trail."
+    }
+  }
+}

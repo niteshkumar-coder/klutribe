@@ -1,0 +1,530 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Reusable Hardened Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedEmail() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isVerifiedEmail() && request.auth.token.email == 'niteshkumar9128ku@gmail.com';
+    }
+
+    function isValidStringList(arr, maxLen) {
+      return arr is list && arr.size() <= maxLen && (arr.size() == 0 || (arr[0] is string && arr[0].size() <= 60));
+    }
+
+    function isSelfUidToggle(oldList, newList, uid) {
+      return (
+        (newList.hasAll(oldList) && newList.size() == oldList.size() + 1 && (uid in newList) && !(uid in oldList)) ||
+        (oldList.hasAll(newList) && oldList.size() == newList.size() + 1 && (uid in oldList) && !(uid in newList))
+      );
+    }
+
+    // --- Validation Blueprints ---
+    function isValidStudentPublic(data) {
+      return data.keys().hasAll([
+          'uid', 'memberNumber', 'maskedStudentId', 'fullName', 'branch', 'year', 'batch',
+          'primaryCategory', 'secondaryInterests', 'skills', 'bio', 'careerGoal',
+          'startupInterest', 'startupIdeaSummary', 'campusMode', 'verificationStatus',
+          'isSuspended', 'allowConnections', 'roadmap', 'categoryUpdatedAtMs',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid', 'memberNumber', 'maskedStudentId', 'fullName', 'branch', 'year', 'batch',
+          'primaryCategory', 'secondaryInterests', 'skills', 'bio', 'careerGoal',
+          'startupInterest', 'startupIdeaSummary', 'campusMode', 'verificationStatus',
+          'isSuspended', 'allowConnections', 'roadmap', 'categoryUpdatedAtMs',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.uid)
+        && data.memberNumber is string && data.memberNumber.size() >= 5 && data.memberNumber.size() <= 20 && data.memberNumber.matches('^KLU-[0-9]{6}$')
+        && data.maskedStudentId is string && data.maskedStudentId.size() >= 4 && data.maskedStudentId.size() <= 20
+        && data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 80
+        && data.branch in ['CSE', 'AI&DS', 'CS&IT', 'ECE', 'EEE', 'ME', 'CE', 'BT']
+        && data.year in ['1st Year', '2nd Year', '3rd Year', '4th Year']
+        && data.batch is string && data.batch.size() >= 4 && data.batch.size() <= 20
+        && data.primaryCategory in ['corporate-architect', 'strategic-builder', 'campus-maverick', 'day1-hustler', 'wildcard']
+        && isValidStringList(data.secondaryInterests, 5)
+        && isValidStringList(data.skills, 15)
+        && data.bio is string && data.bio.size() <= 500
+        && data.careerGoal is string && data.careerGoal.size() <= 200
+        && data.startupInterest is bool
+        && data.startupIdeaSummary is string && data.startupIdeaSummary.size() <= 280
+        && data.campusMode in ['', 'Hosteller', 'Day Scholar']
+        && data.verificationStatus in ['pending_review', 'verified', 'rejected']
+        && data.isSuspended is bool
+        && data.allowConnections is bool
+        && data.roadmap is list && data.roadmap.size() <= 4 && (data.roadmap.size() == 0 || data.roadmap[0] is map)
+        && data.categoryUpdatedAtMs is number && data.categoryUpdatedAtMs >= 0
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStudentPrivate(data) {
+      return data.keys().hasAll(['uid', 'email', 'phone', 'kluStudentId', 'gender', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'phone', 'kluStudentId', 'gender', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+        && data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 16
+        && data.kluStudentId is string && data.kluStudentId.size() >= 6 && data.kluStudentId.size() <= 20
+        && data.gender in ['', 'Male', 'Female', 'Non-binary', 'Prefer not to say']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAdminRecord(data) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'email', 'createdAt'])
+        && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+        && data.createdAt is timestamp;
+    }
+
+    function isValidConnection(data) {
+      return data.keys().hasAll(['fromUid', 'toUid', 'fromName', 'toName', 'participantUids', 'status', 'note', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['fromUid', 'toUid', 'fromName', 'toName', 'participantUids', 'status', 'note', 'createdAt', 'updatedAt'])
+        && isValidId(data.fromUid)
+        && isValidId(data.toUid)
+        && data.fromUid != data.toUid
+        && data.fromName is string && data.fromName.size() >= 1 && data.fromName.size() <= 80
+        && data.toName is string && data.toName.size() >= 1 && data.toName.size() <= 80
+        && data.participantUids is list && data.participantUids.size() == 2
+        && data.fromUid in data.participantUids
+        && data.toUid in data.participantUids
+        && data.status in ['pending', 'accepted', 'declined']
+        && data.note is string && data.note.size() <= 240
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['senderUid', 'senderName', 'body', 'createdAt'])
+        && data.keys().hasOnly(['senderUid', 'senderName', 'body', 'createdAt'])
+        && isValidId(data.senderUid)
+        && data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 80
+        && data.body is string && data.body.size() >= 1 && data.body.size() <= 1000
+        && data.createdAt is timestamp;
+    }
+
+    function isValidIdea(data) {
+      return data.keys().hasAll(['authorUid', 'authorName', 'authorBranch', 'title', 'description', 'problem', 'solution', 'stage', 'requiredSkills', 'rolesNeeded', 'visibility', 'interestedUids', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['authorUid', 'authorName', 'authorBranch', 'title', 'description', 'problem', 'solution', 'stage', 'requiredSkills', 'rolesNeeded', 'visibility', 'interestedUids', 'createdAt', 'updatedAt'])
+        && isValidId(data.authorUid)
+        && data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80
+        && data.authorBranch is string && data.authorBranch.size() >= 2 && data.authorBranch.size() <= 20
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 100
+        && data.description is string && data.description.size() >= 10 && data.description.size() <= 800
+        && data.problem is string && data.problem.size() >= 5 && data.problem.size() <= 400
+        && data.solution is string && data.solution.size() >= 5 && data.solution.size() <= 400
+        && data.stage in ['Concept', 'Validation', 'Prototype', 'MVP', 'Launched']
+        && isValidStringList(data.requiredSkills, 10)
+        && data.rolesNeeded is string && data.rolesNeeded.size() >= 2 && data.rolesNeeded.size() <= 160
+        && data.visibility in ['public', 'private']
+        && isValidStringList(data.interestedUids, 100)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSkillExchange(data) {
+      return data.keys().hasAll(['authorUid', 'authorName', 'authorBranch', 'teachSkill', 'learnSkill', 'note', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['authorUid', 'authorName', 'authorBranch', 'teachSkill', 'learnSkill', 'note', 'status', 'createdAt', 'updatedAt'])
+        && isValidId(data.authorUid)
+        && data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80
+        && data.authorBranch is string && data.authorBranch.size() >= 2 && data.authorBranch.size() <= 20
+        && data.teachSkill is string && data.teachSkill.size() >= 2 && data.teachSkill.size() <= 60
+        && data.learnSkill is string && data.learnSkill.size() >= 2 && data.learnSkill.size() <= 60
+        && data.note is string && data.note.size() <= 300
+        && data.status in ['open', 'matched', 'closed']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidProject(data) {
+      return data.keys().hasAll(['authorUid', 'authorName', 'title', 'description', 'techStack', 'openRoles', 'githubUrl', 'portfolioUrl', 'isHackathonTeam', 'memberUids', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['authorUid', 'authorName', 'title', 'description', 'techStack', 'openRoles', 'githubUrl', 'portfolioUrl', 'isHackathonTeam', 'memberUids', 'status', 'createdAt', 'updatedAt'])
+        && isValidId(data.authorUid)
+        && data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 100
+        && data.description is string && data.description.size() >= 10 && data.description.size() <= 600
+        && isValidStringList(data.techStack, 12)
+        && data.openRoles is string && data.openRoles.size() >= 2 && data.openRoles.size() <= 160
+        && data.githubUrl is string && data.githubUrl.size() <= 240
+        && data.portfolioUrl is string && data.portfolioUrl.size() <= 240
+        && data.isHackathonTeam is bool
+        && isValidStringList(data.memberUids, 20)
+        && data.status in ['recruiting', 'active', 'completed']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidOpportunity(data) {
+      return data.keys().hasAll(['submittedByUid', 'submittedByName', 'title', 'organization', 'category', 'source', 'eligibility', 'deadline', 'applyUrl', 'approvalStatus', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['submittedByUid', 'submittedByName', 'title', 'organization', 'category', 'source', 'eligibility', 'deadline', 'applyUrl', 'approvalStatus', 'createdAt', 'updatedAt'])
+        && isValidId(data.submittedByUid)
+        && data.submittedByName is string && data.submittedByName.size() >= 1 && data.submittedByName.size() <= 80
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 120
+        && data.organization is string && data.organization.size() >= 2 && data.organization.size() <= 100
+        && data.category in ['Internship', 'Part-Time', 'Freelancing', 'Hackathon', 'Competition', 'Scholarship', 'Placement Prep', 'Startup Program']
+        && data.source is string && data.source.size() >= 2 && data.source.size() <= 100
+        && data.eligibility is string && data.eligibility.size() >= 2 && data.eligibility.size() <= 160
+        && data.deadline is string && data.deadline.size() >= 2 && data.deadline.size() <= 60
+        && data.applyUrl is string && data.applyUrl.size() >= 8 && data.applyUrl.size() <= 300
+        && data.approvalStatus in ['pending', 'approved', 'rejected']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCampusEvent(data) {
+      return data.keys().hasAll(['createdByUid', 'title', 'section', 'dateLabel', 'venue', 'description', 'attendeeUids', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['createdByUid', 'title', 'section', 'dateLabel', 'venue', 'description', 'attendeeUids', 'createdAt', 'updatedAt'])
+        && isValidId(data.createdByUid)
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 120
+        && data.section in ['Samyak', 'Surabhi', 'Clubs', 'Sports', 'Events', 'Achievements', 'Weekend']
+        && data.dateLabel is string && data.dateLabel.size() >= 2 && data.dateLabel.size() <= 60
+        && data.venue is string && data.venue.size() >= 2 && data.venue.size() <= 100
+        && data.description is string && data.description.size() >= 10 && data.description.size() <= 600
+        && isValidStringList(data.attendeeUids, 200)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidReport(data) {
+      return data.keys().hasAll(['reporterUid', 'targetType', 'targetId', 'reason', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['reporterUid', 'targetType', 'targetId', 'reason', 'status', 'createdAt', 'updatedAt'])
+        && isValidId(data.reporterUid)
+        && data.targetType in ['opportunity', 'student', 'idea', 'project']
+        && isValidId(data.targetId)
+        && data.reason is string && data.reason.size() >= 5 && data.reason.size() <= 400
+        && data.status in ['open', 'resolved', 'dismissed']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['adminUid', 'adminEmail', 'action', 'targetId', 'details', 'createdAt'])
+        && data.keys().hasOnly(['adminUid', 'adminEmail', 'action', 'targetId', 'details', 'createdAt'])
+        && isValidId(data.adminUid)
+        && data.adminEmail is string && data.adminEmail.size() >= 3 && data.adminEmail.size() <= 160
+        && data.action is string && data.action.size() >= 2 && data.action.size() <= 80
+        && isValidId(data.targetId)
+        && data.details is string && data.details.size() >= 2 && data.details.size() <= 300
+        && data.createdAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+
+    // 1. Public Student Profiles (Zero PII)
+    match /students/{studentId} {
+      allow get: if isValidId(studentId) && (resource.data.isSuspended == false || isOwner(studentId) || isAdmin());
+      allow list: if resource.data.isSuspended == false || isAdmin();
+      allow create: if isVerifiedEmail()
+        && isValidId(studentId)
+        && isOwner(studentId)
+        && isValidStudentPublic(incoming())
+        && incoming().uid == request.auth.uid
+        && incoming().verificationStatus == 'pending_review'
+        && incoming().isSuspended == false
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isSignedIn() && isValidStudentPublic(incoming()) && (
+        (
+          isVerifiedEmail()
+          && isOwner(studentId)
+          && !existing().isSuspended
+          && incoming().uid == existing().uid
+          && incoming().memberNumber == existing().memberNumber
+          && incoming().verificationStatus == existing().verificationStatus
+          && incoming().isSuspended == existing().isSuspended
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'fullName', 'maskedStudentId', 'branch', 'year', 'batch', 'primaryCategory',
+            'secondaryInterests', 'skills', 'bio', 'careerGoal', 'startupInterest',
+            'startupIdeaSummary', 'campusMode', 'allowConnections', 'roadmap',
+            'categoryUpdatedAtMs', 'updatedAt'
+          ])
+        ) || (
+          isAdmin()
+          && incoming().uid == existing().uid
+          && incoming().memberNumber == existing().memberNumber
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['verificationStatus', 'isSuspended', 'updatedAt'])
+        )
+      );
+      allow delete: if isAdmin() && isValidId(studentId);
+
+      // 2. Isolated Private PII Subcollection
+      match /private/{docId} {
+        allow get: if isValidId(studentId) && isValidId(docId) && (isOwner(studentId) || isAdmin());
+        allow list: if isOwner(studentId) || isAdmin();
+        allow create: if isVerifiedEmail()
+          && isValidId(studentId) && isValidId(docId)
+          && isOwner(studentId)
+          && isValidStudentPrivate(incoming())
+          && incoming().uid == request.auth.uid
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isSignedIn() && isValidStudentPrivate(incoming()) && (
+          isVerifiedEmail()
+          && isOwner(studentId)
+          && incoming().uid == existing().uid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['phone', 'kluStudentId', 'gender', 'updatedAt'])
+        );
+        allow delete: if isAdmin() && isValidId(studentId) && isValidId(docId);
+      }
+    }
+
+    // 3. Admins
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && (isOwner(adminId) || isAdmin());
+      allow list: if isAdmin();
+      allow create, update: if isAdmin() && isValidId(adminId) && isValidAdminRecord(incoming());
+      allow delete: if isAdmin() && isValidId(adminId);
+    }
+
+    // 4. Mutual Connections & Direct Messaging
+    match /connections/{connectionId} {
+      allow get: if isValidId(connectionId) && isSignedIn() && (request.auth.uid in resource.data.participantUids || isAdmin());
+      allow list: if isSignedIn() && (request.auth.uid in resource.data.participantUids || isAdmin());
+      allow create: if isVerifiedEmail()
+        && isValidId(connectionId)
+        && isValidConnection(incoming())
+        && incoming().fromUid == request.auth.uid
+        && incoming().status == 'pending'
+        && exists(/databases/$(database)/documents/students/$(incoming().fromUid))
+        && exists(/databases/$(database)/documents/students/$(incoming().toUid))
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isSignedIn() && isValidConnection(incoming()) && (
+        (
+          isVerifiedEmail()
+          && request.auth.uid == existing().toUid
+          && existing().status == 'pending'
+          && incoming().status in ['accepted', 'declined']
+          && incoming().fromUid == existing().fromUid
+          && incoming().toUid == existing().toUid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+        ) || isAdmin()
+      );
+      allow delete: if isValidId(connectionId) && isSignedIn() && (
+        request.auth.uid in existing().participantUids || isAdmin()
+      );
+
+      match /messages/{messageId} {
+        allow get: if isValidId(connectionId) && isValidId(messageId) && isSignedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/connections/$(connectionId)).data.participantUids;
+        allow list: if isSignedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/connections/$(connectionId)).data.participantUids;
+        allow create: if isVerifiedEmail()
+          && isValidId(connectionId) && isValidId(messageId)
+          && isValidMessage(incoming())
+          && incoming().senderUid == request.auth.uid
+          && incoming().createdAt == request.time
+          && get(/databases/$(database)/documents/connections/$(connectionId)).data.status == 'accepted'
+          && request.auth.uid in get(/databases/$(database)/documents/connections/$(connectionId)).data.participantUids;
+        allow update, delete: if false;
+      }
+    }
+
+    // 5. Startup & Idea Board
+    match /ideas/{ideaId} {
+      allow get: if isValidId(ideaId) && (resource.data.visibility == 'public' || (isSignedIn() && resource.data.authorUid == request.auth.uid) || isAdmin());
+      allow list: if resource.data.visibility == 'public' || (isSignedIn() && resource.data.authorUid == request.auth.uid) || isAdmin();
+      allow create: if isVerifiedEmail()
+        && isValidId(ideaId)
+        && isValidIdea(incoming())
+        && incoming().authorUid == request.auth.uid
+        && exists(/databases/$(database)/documents/students/$(request.auth.uid))
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isSignedIn() && isValidIdea(incoming()) && (
+        (
+          isVerifiedEmail()
+          && existing().authorUid == request.auth.uid
+          && incoming().authorUid == existing().authorUid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'problem', 'solution', 'stage', 'requiredSkills', 'rolesNeeded', 'visibility', 'updatedAt'])
+        ) || (
+          isVerifiedEmail()
+          && existing().visibility == 'public'
+          && incoming().authorUid == existing().authorUid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['interestedUids', 'updatedAt'])
+          && isSelfUidToggle(existing().interestedUids, incoming().interestedUids, request.auth.uid)
+        ) || isAdmin()
+      );
+      allow delete: if isValidId(ideaId) && isSignedIn() && (existing().authorUid == request.auth.uid || isAdmin());
+    }
+
+    // 6. Skill Exchange
+    match /skillExchanges/{exchangeId} {
+      allow get: if isValidId(exchangeId) && (resource.data.status in ['open', 'matched'] || (isSignedIn() && resource.data.authorUid == request.auth.uid) || isAdmin());
+      allow list: if resource.data.status in ['open', 'matched'] || (isSignedIn() && resource.data.authorUid == request.auth.uid) || isAdmin();
+      allow create: if isVerifiedEmail()
+        && isValidId(exchangeId)
+        && isValidSkillExchange(incoming())
+        && incoming().authorUid == request.auth.uid
+        && incoming().status == 'open'
+        && exists(/databases/$(database)/documents/students/$(request.auth.uid))
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isSignedIn() && isValidSkillExchange(incoming()) && (
+        (
+          isVerifiedEmail()
+          && existing().authorUid == request.auth.uid
+          && incoming().authorUid == existing().authorUid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['teachSkill', 'learnSkill', 'note', 'status', 'updatedAt'])
+        ) || isAdmin()
+      );
+      allow delete: if isValidId(exchangeId) && isSignedIn() && (existing().authorUid == request.auth.uid || isAdmin());
+    }
+
+    // 7. Projects & Teams
+    match /projects/{projectId} {
+      allow get: if isValidId(projectId) && (resource.data.status in ['recruiting', 'active', 'completed'] || isAdmin());
+      allow list: if resource.data.status in ['recruiting', 'active', 'completed'] || isAdmin();
+      allow create: if isVerifiedEmail()
+        && isValidId(projectId)
+        && isValidProject(incoming())
+        && incoming().authorUid == request.auth.uid
+        && request.auth.uid in incoming().memberUids
+        && exists(/databases/$(database)/documents/students/$(request.auth.uid))
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isSignedIn() && isValidProject(incoming()) && (
+        (
+          isVerifiedEmail()
+          && existing().authorUid == request.auth.uid
+          && incoming().authorUid == existing().authorUid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'techStack', 'openRoles', 'githubUrl', 'portfolioUrl', 'isHackathonTeam', 'memberUids', 'status', 'updatedAt'])
+        ) || (
+          isVerifiedEmail()
+          && existing().status == 'recruiting'
+          && incoming().authorUid == existing().authorUid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['memberUids', 'updatedAt'])
+          && isSelfUidToggle(existing().memberUids, incoming().memberUids, request.auth.uid)
+        ) || isAdmin()
+      );
+      allow delete: if isValidId(projectId) && isSignedIn() && (existing().authorUid == request.auth.uid || isAdmin());
+    }
+
+    // 8. Opportunities (Moderated)
+    match /opportunities/{opportunityId} {
+      allow get: if isValidId(opportunityId) && (resource.data.approvalStatus == 'approved' || (isSignedIn() && resource.data.submittedByUid == request.auth.uid) || isAdmin());
+      allow list: if resource.data.approvalStatus == 'approved' || (isSignedIn() && resource.data.submittedByUid == request.auth.uid) || isAdmin();
+      allow create: if isVerifiedEmail()
+        && isValidId(opportunityId)
+        && isValidOpportunity(incoming())
+        && incoming().submittedByUid == request.auth.uid
+        && (incoming().approvalStatus == 'pending' || isAdmin())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isSignedIn() && isValidOpportunity(incoming()) && (
+        isAdmin()
+        && incoming().submittedByUid == existing().submittedByUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['approvalStatus', 'title', 'deadline', 'updatedAt'])
+      );
+      allow delete: if isValidId(opportunityId) && (isAdmin() || (isSignedIn() && existing().submittedByUid == request.auth.uid));
+    }
+
+    // 9. Campus Community Events
+    match /campusEvents/{eventId} {
+      allow get: if isValidId(eventId) && (resource.data.section in ['Samyak', 'Surabhi', 'Clubs', 'Sports', 'Events', 'Achievements', 'Weekend'] || isAdmin());
+      allow list: if resource.data.section in ['Samyak', 'Surabhi', 'Clubs', 'Sports', 'Events', 'Achievements', 'Weekend'] || isAdmin();
+      allow create: if isVerifiedEmail()
+        && isValidId(eventId)
+        && isValidCampusEvent(incoming())
+        && incoming().createdByUid == request.auth.uid
+        && (isAdmin() || exists(/databases/$(database)/documents/students/$(request.auth.uid)))
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isSignedIn() && isValidCampusEvent(incoming()) && (
+        (
+          isVerifiedEmail()
+          && incoming().createdByUid == existing().createdByUid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['attendeeUids', 'updatedAt'])
+          && isSelfUidToggle(existing().attendeeUids, incoming().attendeeUids, request.auth.uid)
+        ) || isAdmin()
+      );
+      allow delete: if isValidId(eventId) && isAdmin();
+    }
+
+    // 10. Moderation Reports
+    match /reports/{reportId} {
+      allow get: if isValidId(reportId) && isSignedIn() && (resource.data.reporterUid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.reporterUid == request.auth.uid || isAdmin());
+      allow create: if isVerifiedEmail()
+        && isValidId(reportId)
+        && isValidReport(incoming())
+        && incoming().reporterUid == request.auth.uid
+        && incoming().status == 'open'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isSignedIn() && isValidReport(incoming()) && (
+        isAdmin()
+        && existing().status == 'open'
+        && incoming().reporterUid == existing().reporterUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+      );
+      allow delete: if isValidId(reportId) && isAdmin();
+    }
+
+    // 11. Admin Audit Logs (Immutable)
+    match /auditLogs/{logId} {
+      allow get: if isValidId(logId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin()
+        && isValidId(logId)
+        && isValidAuditLog(incoming())
+        && incoming().adminUid == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update, delete: if false;
+    }
+  }
+}
