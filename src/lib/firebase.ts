@@ -9,6 +9,20 @@ export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
+type AuthWithResolver = typeof auth & {
+  _popupRedirectResolver?: {
+    _initialize?: (instance: typeof auth) => Promise<unknown>;
+  };
+};
+
+export function prewarmGooglePopup(): void {
+  if (typeof window === 'undefined') return;
+  const resolver = (auth as AuthWithResolver)._popupRedirectResolver;
+  if (resolver && typeof resolver._initialize === 'function') {
+    void resolver._initialize(auth).catch(() => null);
+  }
+}
+
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',

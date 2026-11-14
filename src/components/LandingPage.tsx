@@ -426,7 +426,8 @@ export function LandingPage({
               <button
                 type="button"
                 onClick={onPrimaryAction}
-                className="group rounded-2xl border border-zinc-100 bg-white p-5 text-center space-y-3 shadow-xs hover:border-rose-200 hover:shadow-md transition-all"
+                disabled={signingIn}
+                className="group rounded-2xl border border-zinc-100 bg-white p-5 text-center space-y-3 shadow-xs hover:border-rose-200 hover:shadow-md transition-all disabled:opacity-60"
               >
                 <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-xl bg-rose-50 text-[#C8102E] group-hover:bg-[#C8102E] group-hover:text-white transition-colors">
                   <Code2 className="h-5 w-5" />
@@ -440,7 +441,8 @@ export function LandingPage({
               <button
                 type="button"
                 onClick={onPrimaryAction}
-                className="group rounded-2xl border border-zinc-100 bg-white p-5 text-center space-y-3 shadow-xs hover:border-rose-200 hover:shadow-md transition-all"
+                disabled={signingIn}
+                className="group rounded-2xl border border-zinc-100 bg-white p-5 text-center space-y-3 shadow-xs hover:border-rose-200 hover:shadow-md transition-all disabled:opacity-60"
               >
                 <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-xl bg-rose-50 text-[#C8102E] group-hover:bg-[#C8102E] group-hover:text-white transition-colors">
                   <Calendar className="h-5 w-5" />
@@ -454,7 +456,8 @@ export function LandingPage({
               <button
                 type="button"
                 onClick={onPrimaryAction}
-                className="group rounded-2xl border border-zinc-100 bg-white p-5 text-center space-y-3 shadow-xs hover:border-rose-200 hover:shadow-md transition-all"
+                disabled={signingIn}
+                className="group rounded-2xl border border-zinc-100 bg-white p-5 text-center space-y-3 shadow-xs hover:border-rose-200 hover:shadow-md transition-all disabled:opacity-60"
               >
                 <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-xl bg-rose-50 text-[#C8102E] group-hover:bg-[#C8102E] group-hover:text-white transition-colors">
                   <Rocket className="h-5 w-5" />
