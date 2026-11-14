@@ -1,5 +1,12 @@
 import { Component, useEffect, useState, type ReactNode } from 'react';
-import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
+import {
+  getRedirectResult,
+  onAuthStateChanged,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut,
+  type User,
+} from 'firebase/auth';
 import {
   ArrowLeftRight,
   BarChart3,
@@ -8,10 +15,12 @@ import {
   Calendar,
   Code2,
   CreditCard,
+  ExternalLink,
   Home,
   Lightbulb,
   LogOut,
   Menu,
+  RefreshCw,
   Settings,
   Shield,
   Users,
@@ -116,6 +125,7 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [popupBlocked, setPopupBlocked] = useState(false);
 
   const [students, setStudents] = useState<StudentPublic[]>([]);
   const [studentsLoaded, setStudentsLoaded] = useState(false);
@@ -135,6 +145,7 @@ export default function App() {
 
   useEffect(() => {
     testFirestoreConnection();
+    getRedirectResult(auth).catch(() => null);
     const unsubAuth = onAuthStateChanged(auth, async (nextUser) => {
       setUser(nextUser);
       if (nextUser) {
@@ -199,17 +210,42 @@ export default function App() {
   }, [authReady, user]);
 
   const handleGoogleSignIn = async () => {
+    // Initiate popup synchronously on click to preserve strict browser user-gesture activation
+    const popupPromise = signInWithPopup(auth, googleProvider);
     setSigningIn(true);
     setAuthError(null);
+    setPopupBlocked(false);
     try {
-      await signInWithPopup(auth, googleProvider);
+      await popupPromise;
       setShowLanding(false);
     } catch (err) {
-      const code = typeof err === 'object' && err !== null && 'code' in err ? String((err as { code?: unknown }).code) : '';
+      const code =
+        typeof err === 'object' && err !== null && 'code' in err
+          ? String((err as { code?: unknown }).code)
+          : '';
       if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
         return;
       }
-      setAuthError(err instanceof Error ? err.message : 'Google Sign-In blocked by browser.');
+      if (code === 'auth/popup-blocked') {
+        const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
+        if (!isInIframe) {
+          try {
+            await signInWithRedirect(auth, googleProvider);
+            return;
+          } catch {
+            // Fall through to helpful helper modal
+          }
+        }
+        setPopupBlocked(true);
+        return;
+      }
+      if (code === 'auth/unauthorized-domain') {
+        setAuthError(
+          'This domain is not authorized in Firebase Auth. Open the app from your main preview URL.'
+        );
+        return;
+      }
+      setAuthError(err instanceof Error ? err.message : 'Unable to complete Google Sign-In.');
     } finally {
       setSigningIn(false);
     }
@@ -249,6 +285,58 @@ export default function App() {
   if (!user || showLanding) {
     return (
       <ErrorBoundary>
+        {popupBlocked && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+            <div className="w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-6 space-y-4 shadow-2xl">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-[#C8102E]">
+                    Browser Pop-up Blocked
+                  </p>
+                  <h2 className="font-display text-lg font-extrabold text-zinc-950">
+                    Allow Google Sign-In Pop-up
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPopupBlocked(false)}
+                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <p className="text-xs sm:text-sm leading-relaxed text-zinc-600">
+                Aapke browser ne Google Sign-In pop-up ko block kar diya hai. Address bar ke right side me{' '}
+                <strong className="text-zinc-900">Pop-up blocked</strong> icon par click karke{' '}
+                <strong className="text-zinc-900">Always allow pop-ups</strong> select karein, ya neeche diye gaye direct tab me khol kar Login karein.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={signingIn}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#C8102E] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#A30D25] transition-colors disabled:opacity-60"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Try Google Sign-In Again
+                </button>
+                <a
+                  href={typeof window !== 'undefined' ? window.location.href : '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setPopupBlocked(false)}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-50 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Open in New Tab
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
         {authError && (
           <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 shadow-lg">
             <span>{authError}</span>
