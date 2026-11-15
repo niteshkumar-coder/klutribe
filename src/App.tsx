@@ -1,7 +1,9 @@
 import { Component, useEffect, useState, type ReactNode } from 'react';
 import {
+  getRedirectResult,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   type User,
 } from 'firebase/auth';
@@ -143,6 +145,20 @@ export default function App() {
   useEffect(() => {
     testFirestoreConnection();
     prewarmGooglePopup();
+    getRedirectResult(auth).catch((err: unknown) => {
+      const code =
+        typeof err === 'object' && err !== null && 'code' in err
+          ? String((err as { code?: unknown }).code)
+          : '';
+      if (code === 'auth/unauthorized-domain') {
+        const host = typeof window !== 'undefined' ? window.location.hostname : 'this domain';
+        setAuthError(
+          `Domain "${host}" is not authorized in Firebase Auth. Add "${host}" under Firebase Console → Authentication → Settings → Authorized domains.`
+        );
+      } else if (err instanceof Error && code && code !== 'auth/no-auth-event') {
+        setAuthError(err.message);
+      }
+    });
     const unsubAuth = onAuthStateChanged(auth, async (nextUser) => {
       setUser(nextUser);
       if (nextUser) {
@@ -232,6 +248,32 @@ export default function App() {
         return;
       }
       if (code === 'auth/popup-blocked') {
+        const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
+        if (!isInIframe) {
+          try {
+            await signInWithRedirect(auth, googleProvider);
+            return;
+          } catch (redirectErr) {
+            const redirectCode =
+              typeof redirectErr === 'object' && redirectErr !== null && 'code' in redirectErr
+                ? String((redirectErr as { code?: unknown }).code)
+                : '';
+            if (redirectCode === 'auth/unauthorized-domain') {
+              const host = typeof window !== 'undefined' ? window.location.hostname : 'this domain';
+              setAuthError(
+                `Domain "${host}" is not authorized in Firebase Auth. Add "${host}" under Firebase Console → Authentication → Settings → Authorized domains.`
+              );
+              return;
+            }
+            setAuthErrorCanRetry(true);
+            setAuthError(
+              redirectErr instanceof Error
+                ? redirectErr.message
+                : 'Google Sign-In pop-up was blocked. Allow pop-ups for this site and click Retry Sign-In.'
+            );
+            return;
+          }
+        }
         prewarmGooglePopup();
         setAuthErrorCanRetry(true);
         setAuthError(
