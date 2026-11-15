@@ -125,6 +125,7 @@ export default function App() {
   const [signingIn, setSigningIn] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authErrorCanRetry, setAuthErrorCanRetry] = useState(false);
+  const [authErrorCanRedirect, setAuthErrorCanRedirect] = useState(false);
 
   const [students, setStudents] = useState<StudentPublic[]>([]);
   const [studentsLoaded, setStudentsLoaded] = useState(false);
@@ -154,8 +155,9 @@ export default function App() {
           window.sessionStorage.removeItem('klu_redirect_pending');
           if (!result?.user && !auth.currentUser) {
             setAuthErrorCanRetry(true);
+            setAuthErrorCanRedirect(false);
             setAuthError(
-              'Google redirect returned, lekin aapke browser ne cross-site login session block kar diya. Kripya is site ke liye pop-ups Allow karein (ya popup-blocker extension pause karein) aur Retry Sign-In par click karein.'
+              'Aapke Chrome ne cross-site Redirect login session block kar diya hai. Login karne ke liye: (1) Chrome me is site ke Pop-ups Allow karein, (2) toolbar ka Ad/Pop-up blocker extension pause karein (ya Chrome Incognito window me kholen), aur Retry Sign-In dabaein.'
             );
           }
         }
@@ -247,6 +249,7 @@ export default function App() {
     setSigningIn(true);
     setAuthError(null);
     setAuthErrorCanRetry(false);
+    setAuthErrorCanRedirect(false);
     try {
       await popupPromise;
       setShowLanding(false);
@@ -268,8 +271,9 @@ export default function App() {
       if (code === 'auth/popup-blocked') {
         prewarmGooglePopup();
         setAuthErrorCanRetry(true);
+        setAuthErrorCanRedirect(typeof window !== 'undefined' && window.self === window.top);
         setAuthError(
-          'Browser ya extension ne Google Sign-In pop-up block kar diya hai. Pop-ups Allow karein (ya ad/popup blocker pause karein) aur Retry Sign-In par click karein.'
+          'Browser ya extension ne Google Sign-In pop-up block kar diya hai. Is site par Pop-ups Allow karein (ya Ad/Pop-up blocker pause karein) aur Retry Sign-In par click karein.'
         );
         return;
       }
@@ -284,6 +288,7 @@ export default function App() {
     setSigningIn(true);
     setAuthError(null);
     setAuthErrorCanRetry(false);
+    setAuthErrorCanRedirect(false);
     try {
       if (typeof window !== 'undefined') {
         window.sessionStorage.setItem('klu_redirect_pending', '1');
@@ -361,7 +366,7 @@ export default function App() {
                     <RefreshCw className="w-3 h-3" />
                     Retry Sign-In
                   </button>
-                  {typeof window !== 'undefined' && window.self === window.top && (
+                  {authErrorCanRedirect && (
                     <button
                       type="button"
                       onClick={handleGoogleRedirectFallback}
@@ -379,6 +384,7 @@ export default function App() {
               onClick={() => {
                 setAuthError(null);
                 setAuthErrorCanRetry(false);
+                setAuthErrorCanRedirect(false);
               }}
               className="rounded-md p-0.5 text-zinc-400 hover:text-zinc-900"
               aria-label="Dismiss"
