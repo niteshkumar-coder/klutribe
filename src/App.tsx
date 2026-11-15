@@ -145,20 +145,38 @@ export default function App() {
   useEffect(() => {
     testFirestoreConnection();
     prewarmGooglePopup();
-    getRedirectResult(auth).catch((err: unknown) => {
-      const code =
-        typeof err === 'object' && err !== null && 'code' in err
-          ? String((err as { code?: unknown }).code)
-          : '';
-      if (code === 'auth/unauthorized-domain') {
-        const host = typeof window !== 'undefined' ? window.location.hostname : 'this domain';
-        setAuthError(
-          `Domain "${host}" is not authorized in Firebase Auth. Add "${host}" under Firebase Console → Authentication → Settings → Authorized domains.`
-        );
-      } else if (err instanceof Error && code && code !== 'auth/no-auth-event') {
-        setAuthError(err.message);
-      }
-    });
+    getRedirectResult(auth)
+      .then((result) => {
+        const hadPendingRedirect =
+          typeof window !== 'undefined' &&
+          window.sessionStorage.getItem('klu_redirect_pending') === '1';
+        if (hadPendingRedirect) {
+          window.sessionStorage.removeItem('klu_redirect_pending');
+          if (!result?.user && !auth.currentUser) {
+            setAuthErrorCanRetry(true);
+            setAuthError(
+              'Google redirect returned, lekin aapke browser ne cross-site login session block kar diya. Kripya is site ke liye pop-ups Allow karein (ya popup-blocker extension pause karein) aur Retry Sign-In par click karein.'
+            );
+          }
+        }
+      })
+      .catch((err: unknown) => {
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.removeItem('klu_redirect_pending');
+        }
+        const code =
+          typeof err === 'object' && err !== null && 'code' in err
+            ? String((err as { code?: unknown }).code)
+            : '';
+        if (code === 'auth/unauthorized-domain') {
+          const host = typeof window !== 'undefined' ? window.location.hostname : 'this domain';
+          setAuthError(
+            `Domain "${host}" is not authorized in Firebase Auth. Add "${host}" under Firebase Console → Authentication → Settings → Authorized domains.`
+          );
+        } else if (err instanceof Error && code && code !== 'auth/no-auth-event') {
+          setAuthError(err.message);
+        }
+      });
     const unsubAuth = onAuthStateChanged(auth, async (nextUser) => {
       setUser(nextUser);
       if (nextUser) {
@@ -248,41 +266,48 @@ export default function App() {
         return;
       }
       if (code === 'auth/popup-blocked') {
-        const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
-        if (!isInIframe) {
-          try {
-            await signInWithRedirect(auth, googleProvider);
-            return;
-          } catch (redirectErr) {
-            const redirectCode =
-              typeof redirectErr === 'object' && redirectErr !== null && 'code' in redirectErr
-                ? String((redirectErr as { code?: unknown }).code)
-                : '';
-            if (redirectCode === 'auth/unauthorized-domain') {
-              const host = typeof window !== 'undefined' ? window.location.hostname : 'this domain';
-              setAuthError(
-                `Domain "${host}" is not authorized in Firebase Auth. Add "${host}" under Firebase Console → Authentication → Settings → Authorized domains.`
-              );
-              return;
-            }
-            setAuthErrorCanRetry(true);
-            setAuthError(
-              redirectErr instanceof Error
-                ? redirectErr.message
-                : 'Google Sign-In pop-up was blocked. Allow pop-ups for this site and click Retry Sign-In.'
-            );
-            return;
-          }
-        }
         prewarmGooglePopup();
         setAuthErrorCanRetry(true);
         setAuthError(
-          'Google Sign-In pop-up could not open. Allow pop-ups for this site and click Retry Sign-In.'
+          'Browser ya extension ne Google Sign-In pop-up block kar diya hai. Pop-ups Allow karein (ya ad/popup blocker pause karein) aur Retry Sign-In par click karein.'
         );
         return;
       }
       setAuthError(err instanceof Error ? err.message : 'Unable to complete Google Sign-In.');
     } finally {
+      setSigningIn(false);
+    }
+  };
+
+  const handleGoogleRedirectFallback = async () => {
+    if (signingIn) return;
+    setSigningIn(true);
+    setAuthError(null);
+    setAuthErrorCanRetry(false);
+    try {
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem('klu_redirect_pending', '1');
+      }
+      await signInWithRedirect(auth, googleProvider);
+    } catch (redirectErr) {
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem('klu_redirect_pending');
+      }
+      const redirectCode =
+        typeof redirectErr === 'object' && redirectErr !== null && 'code' in redirectErr
+          ? String((redirectErr as { code?: unknown }).code)
+          : '';
+      if (redirectCode === 'auth/unauthorized-domain') {
+        const host = typeof window !== 'undefined' ? window.location.hostname : 'this domain';
+        setAuthError(
+          `Domain "${host}" is not authorized in Firebase Auth. Add "${host}" under Firebase Console → Authentication → Settings → Authorized domains.`
+        );
+      } else {
+        setAuthErrorCanRetry(true);
+        setAuthError(
+          redirectErr instanceof Error ? redirectErr.message : 'Unable to start redirect Sign-In.'
+        );
+      }
       setSigningIn(false);
     }
   };
@@ -326,15 +351,27 @@ export default function App() {
             <div className="flex-1 space-y-2">
               <p className="font-medium text-red-700 leading-relaxed">{authError}</p>
               {authErrorCanRetry && (
-                <button
-                  type="button"
-                  onClick={handleGoogleSignIn}
-                  disabled={signingIn}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#C8102E] px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-[#A30D25] transition-colors disabled:opacity-60"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  Retry Sign-In
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignIn}
+                    disabled={signingIn}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#C8102E] px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-[#A30D25] transition-colors disabled:opacity-60"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Retry Sign-In
+                  </button>
+                  {typeof window !== 'undefined' && window.self === window.top && (
+                    <button
+                      type="button"
+                      onClick={handleGoogleRedirectFallback}
+                      disabled={signingIn}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors disabled:opacity-60"
+                    >
+                      Try Redirect Login
+                    </button>
+                  )}
+                </div>
               )}
             </div>
             <button
