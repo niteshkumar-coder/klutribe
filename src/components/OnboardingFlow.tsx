@@ -55,24 +55,24 @@ export function OnboardingFlow({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Step 1: Student Verification + Core Academic Details
+  // Step 1: Student Verification + Core Academic Details (all compulsory)
   const [fullName, setFullName] = useState(displayName || '');
   const [kluStudentId, setKluStudentId] = useState('');
-  const [branch, setBranch] = useState<Branch>('CSE');
-  const [year, setYear] = useState<AcademicYear>('1st Year');
+  const [branch, setBranch] = useState<Branch | ''>('');
+  const [year, setYear] = useState<AcademicYear | ''>('');
   const [phone, setPhone] = useState('');
   const [gender, setGender] = useState<GenderOption>('');
   const [campusMode, setCampusMode] = useState<CampusMode>('');
 
-  // Step 2: Profile, Skills & Startup Intent
-  const [skills, setSkills] = useState<string[]>(['React / Next.js']);
+  // Step 2: Profile, Skills & Startup Intent (all compulsory)
+  const [skills, setSkills] = useState<string[]>([]);
   const [bio, setBio] = useState('');
   const [careerGoal, setCareerGoal] = useState('');
-  const [startupInterest, setStartupInterest] = useState(false);
+  const [startupInterest, setStartupInterest] = useState<boolean | null>(null);
   const [startupIdeaSummary, setStartupIdeaSummary] = useState('');
 
-  // Step 3: Choose Your Path
-  const [primaryCategory, setPrimaryCategory] = useState<ArchetypeId>('day1-hustler');
+  // Step 3: Choose Your Path (all compulsory)
+  const [primaryCategory, setPrimaryCategory] = useState<ArchetypeId | null>(null);
   const [secondaryInterests, setSecondaryInterests] = useState<string[]>([]);
 
   const isKluIdValid = /^[a-zA-Z0-9]{6,20}$/.test(kluStudentId.trim());
@@ -100,12 +100,66 @@ export function OnboardingFlow({
     }
     const cleanId = kluStudentId.trim();
     if (!/^[a-zA-Z0-9]{6,20}$/.test(cleanId)) {
-      setError('Enter a valid 10-digit KL University Student ID (6–20 alphanumeric characters).');
+      setError('Enter a valid KL University Student ID (6–20 alphanumeric characters).');
+      return false;
+    }
+    if (!branch) {
+      setError('Select your B.Tech branch.');
+      return false;
+    }
+    if (!year) {
+      setError('Select your current academic year.');
       return false;
     }
     const digits = phone.replace(/\D/g, '');
     if (digits.length < 10 || digits.length > 15) {
       setError('Enter a valid 10-digit mobile number (stored privately, never public).');
+      return false;
+    }
+    if (!gender) {
+      setError('Select your gender.');
+      return false;
+    }
+    if (!campusMode) {
+      setError('Select your campus mode (Hosteller or Day Scholar).');
+      return false;
+    }
+    setError(null);
+    return true;
+  };
+
+  const validateStep2 = (): boolean => {
+    if (skills.length < 1) {
+      setError('Select at least 1 skill to continue.');
+      return false;
+    }
+    if (bio.trim().length < 10) {
+      setError('Write a short bio (at least 10 characters).');
+      return false;
+    }
+    if (careerGoal.trim().length < 5) {
+      setError('Enter your 4-year career goal (at least 5 characters).');
+      return false;
+    }
+    if (startupInterest === null) {
+      setError('Select whether you are interested in startup building or co-founder matching.');
+      return false;
+    }
+    if (startupInterest && startupIdeaSummary.trim().length < 5) {
+      setError('Enter your 1-line startup idea or problem domain (at least 5 characters).');
+      return false;
+    }
+    setError(null);
+    return true;
+  };
+
+  const validateStep3 = (): boolean => {
+    if (!primaryCategory) {
+      setError('Choose your primary path to continue.');
+      return false;
+    }
+    if (secondaryInterests.length < 1) {
+      setError('Select at least 1 secondary interest.');
       return false;
     }
     setError(null);
@@ -114,8 +168,24 @@ export function OnboardingFlow({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (step === 1) {
+      if (validateStep1()) setStep(2);
+      return;
+    }
+    if (step === 2) {
+      if (validateStep2()) setStep(3);
+      return;
+    }
     if (!validateStep1()) {
       setStep(1);
+      return;
+    }
+    if (!validateStep2()) {
+      setStep(2);
+      return;
+    }
+    if (!validateStep3() || !branch || !year || !primaryCategory || startupInterest === null) {
+      setStep(3);
       return;
     }
     setSubmitting(true);
@@ -128,7 +198,7 @@ export function OnboardingFlow({
         kluStudentId,
         branch,
         year,
-        phone: phone.replace(/\s+/g, ''),
+        phone: phone.replace(/[^\d+]/g, '').slice(0, 16),
         gender,
         campusMode,
         primaryCategory,
@@ -137,7 +207,7 @@ export function OnboardingFlow({
         bio,
         careerGoal,
         startupInterest,
-        startupIdeaSummary,
+        startupIdeaSummary: startupInterest ? startupIdeaSummary : '',
         roadmap: DEFAULT_ROADMAP,
       });
       onComplete();
@@ -171,7 +241,7 @@ export function OnboardingFlow({
         />
       </div>
 
-      <div className="relative z-10 w-full max-w-5xl overflow-hidden rounded-3xl border border-zinc-200/90 bg-white shadow-[0_24px_60px_-15px_rgba(17,24,39,0.16)] grid grid-cols-1 lg:grid-cols-12">
+      <div className="relative z-10 w-full max-w-5xl xl:max-w-6xl overflow-hidden rounded-3xl border border-zinc-200/90 bg-white shadow-[0_24px_60px_-15px_rgba(17,24,39,0.16)] grid grid-cols-1 lg:grid-cols-12">
         {/* Left Vertical Stepper Rail */}
         <aside className="lg:col-span-4 border-b lg:border-b-0 lg:border-r border-zinc-200 bg-[#FAFAFA] p-6 sm:p-8 flex flex-col justify-between gap-8">
           <div className="space-y-8">
@@ -200,8 +270,19 @@ export function OnboardingFlow({
                     key={item.num}
                     type="button"
                     onClick={() => {
-                      if (item.num === 1 || validateStep1()) {
-                        setStep(item.num);
+                      if (item.num === 1) {
+                        setError(null);
+                        setStep(1);
+                      } else if (item.num === 2) {
+                        if (validateStep1()) setStep(2);
+                      } else if (item.num === 3) {
+                        if (!validateStep1()) {
+                          setStep(1);
+                        } else if (validateStep2()) {
+                          setStep(3);
+                        } else {
+                          setStep(2);
+                        }
                       }
                     }}
                     className="w-full flex items-start gap-3.5 text-left group"
@@ -251,12 +332,12 @@ export function OnboardingFlow({
             {step === 1 && (
               <div className="space-y-5">
                 <div>
-                  <p className="text-xs font-semibold text-[#C8102E]">Step 1 of 3</p>
+                  <p className="text-xs font-semibold text-[#C8102E]">Step 1 of 3 · All fields required</p>
                   <h1 className="mt-1 font-display text-2xl font-bold tracking-tight text-zinc-950">
                     Your Details
                   </h1>
                   <p className="mt-1 text-xs sm:text-sm text-zinc-600">
-                    Your full KLU ID, phone number, and Gmail remain strictly private inside security-ruled records.
+                    All fields are mandatory. Your full KLU ID, phone number, and Gmail remain strictly private inside security-ruled records.
                   </p>
                 </div>
 
@@ -302,10 +383,12 @@ export function OnboardingFlow({
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-zinc-700">B.Tech Branch *</label>
                     <select
+                      required
                       value={branch}
-                      onChange={(e) => setBranch(e.target.value as Branch)}
+                      onChange={(e) => setBranch(e.target.value as Branch | '')}
                       className="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-950 focus:border-[#C8102E] focus:outline-none"
                     >
+                      <option value="">Select your branch</option>
                       {BRANCHES.map((b) => (
                         <option key={b} value={b}>B.Tech — {b}</option>
                       ))}
@@ -315,10 +398,12 @@ export function OnboardingFlow({
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-zinc-700">Current Year *</label>
                     <select
+                      required
                       value={year}
-                      onChange={(e) => setYear(e.target.value as AcademicYear)}
+                      onChange={(e) => setYear(e.target.value as AcademicYear | '')}
                       className="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-950 focus:border-[#C8102E] focus:outline-none"
                     >
+                      <option value="">Select your current year</option>
                       {ACADEMIC_YEARS.map((y) => (
                         <option key={y} value={y}>{y}</option>
                       ))}
@@ -339,13 +424,14 @@ export function OnboardingFlow({
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-zinc-700">Gender (Optional)</label>
+                    <label className="text-xs font-medium text-zinc-700">Gender *</label>
                     <select
+                      required
                       value={gender}
                       onChange={(e) => setGender(e.target.value as GenderOption)}
                       className="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-950 focus:border-[#C8102E] focus:outline-none"
                     >
-                      <option value="">Skip / Leave blank</option>
+                      <option value="">Select your gender</option>
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
                       <option value="Non-binary">Non-binary</option>
@@ -356,12 +442,12 @@ export function OnboardingFlow({
 
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-zinc-700">
-                    Campus Mode (Optional — only shown if opted in)
+                    Campus Mode *
                   </label>
                   <div className="flex flex-wrap gap-2">
-                    {(['', 'Hosteller', 'Day Scholar'] as CampusMode[]).map((mode) => (
+                    {(['Hosteller', 'Day Scholar'] as CampusMode[]).map((mode) => (
                       <button
-                        key={mode || 'none'}
+                        key={mode}
                         type="button"
                         onClick={() => setCampusMode(mode)}
                         className={`rounded-xl border px-4 py-2 text-xs font-medium transition-colors ${
@@ -370,7 +456,7 @@ export function OnboardingFlow({
                             : 'border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400'
                         }`}
                       >
-                        {mode || 'Keep Private'}
+                        {mode}
                       </button>
                     ))}
                   </div>
@@ -394,18 +480,18 @@ export function OnboardingFlow({
             {step === 2 && (
               <div className="space-y-5">
                 <div>
-                  <p className="text-xs font-semibold text-[#C8102E]">Step 2 of 3</p>
+                  <p className="text-xs font-semibold text-[#C8102E]">Step 2 of 3 · All fields required</p>
                   <h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-zinc-950">
                     Skills & Goals
                   </h2>
                   <p className="mt-1 text-xs sm:text-sm text-zinc-600">
-                    Help peers discover you for projects, skill swaps, and co-founder matches.
+                    Complete every section below so peers can discover you for projects, skill swaps, and co-founder matches.
                   </p>
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-zinc-700">
-                    Select Skills ({skills.length}/12)
+                    Select Skills * (Min 1, {skills.length}/12 selected)
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {CURATED_SKILLS.map((skill) => {
@@ -430,8 +516,9 @@ export function OnboardingFlow({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-700">Short Bio (Optional)</label>
+                  <label className="text-xs font-medium text-zinc-700">Short Bio * (Min 10 characters)</label>
                   <textarea
+                    required
                     rows={3}
                     maxLength={500}
                     value={bio}
@@ -442,9 +529,10 @@ export function OnboardingFlow({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-700">4-Year Career Goal (Optional)</label>
+                  <label className="text-xs font-medium text-zinc-700">4-Year Career Goal *</label>
                   <input
                     type="text"
+                    required
                     maxLength={200}
                     value={careerGoal}
                     onChange={(e) => setCareerGoal(e.target.value)}
@@ -454,32 +542,64 @@ export function OnboardingFlow({
                 </div>
 
                 <div className="space-y-3 border-t border-zinc-200 pt-4">
-                  <label className="flex items-center gap-3 text-sm text-zinc-800 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={startupInterest}
-                      onChange={(e) => setStartupInterest(e.target.checked)}
-                      className="h-4 w-4 rounded border-zinc-300 accent-[#C8102E]"
-                    />
-                    Interested in startup building or co-founder matching
-                  </label>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-zinc-700">
+                      Interested in startup building or co-founder matching? *
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setStartupInterest(true)}
+                        className={`rounded-xl border px-4 py-2 text-xs font-medium transition-colors ${
+                          startupInterest === true
+                            ? 'border-[#C8102E] bg-red-50 text-[#C8102E]'
+                            : 'border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400'
+                        }`}
+                      >
+                        Yes, I&apos;m Interested
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStartupInterest(false);
+                          setStartupIdeaSummary('');
+                        }}
+                        className={`rounded-xl border px-4 py-2 text-xs font-medium transition-colors ${
+                          startupInterest === false
+                            ? 'border-[#C8102E] bg-red-50 text-[#C8102E]'
+                            : 'border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400'
+                        }`}
+                      >
+                        No, Not Right Now
+                      </button>
+                    </div>
+                  </div>
 
-                  {startupInterest && (
-                    <input
-                      type="text"
-                      maxLength={280}
-                      value={startupIdeaSummary}
-                      onChange={(e) => setStartupIdeaSummary(e.target.value)}
-                      placeholder="Optional 1-line startup idea or problem domain"
-                      className="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-950 placeholder:text-zinc-400 focus:border-[#C8102E] focus:outline-none"
-                    />
+                  {startupInterest === true && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-zinc-700">
+                        Startup Idea or Problem Domain *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={280}
+                        value={startupIdeaSummary}
+                        onChange={(e) => setStartupIdeaSummary(e.target.value)}
+                        placeholder="1-line startup idea or problem domain you want to work on"
+                        className="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-950 placeholder:text-zinc-400 focus:border-[#C8102E] focus:outline-none"
+                      />
+                    </div>
                   )}
                 </div>
 
                 <div className="flex items-center justify-between gap-4 pt-2">
                   <button
                     type="button"
-                    onClick={() => setStep(1)}
+                    onClick={() => {
+                      setError(null);
+                      setStep(1);
+                    }}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600 hover:text-zinc-950"
                   >
                     <ArrowLeft className="w-4 h-4" />
@@ -487,7 +607,9 @@ export function OnboardingFlow({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setStep(3)}
+                    onClick={() => {
+                      if (validateStep2()) setStep(3);
+                    }}
                     className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-[#C8102E] px-6 py-3 text-sm font-semibold text-white hover:bg-[#A30D25] transition-colors"
                   >
                     Continue
@@ -500,16 +622,20 @@ export function OnboardingFlow({
             {step === 3 && (
               <div className="space-y-5">
                 <div>
-                  <p className="text-xs font-semibold text-[#C8102E]">Step 3 of 3</p>
+                  <p className="text-xs font-semibold text-[#C8102E]">Step 3 of 3 · All fields required</p>
                   <h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-zinc-950">
                     Choose Your Path
                   </h2>
                   <p className="mt-1 text-xs sm:text-sm text-zinc-600">
-                    Select your primary direction (you can update it after 90 days), plus optional secondary interests.
+                    Select your primary direction (you can update it after 90 days) and pick at least one secondary interest.
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-zinc-700">
+                    Primary Path *
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {ARCHETYPES.map((arch) => {
                     const selected = primaryCategory === arch.id;
                     const Icon = ARCHETYPE_ICONS[arch.id];
@@ -555,10 +681,11 @@ export function OnboardingFlow({
                     );
                   })}
                 </div>
+                </div>
 
                 <div className="space-y-2 border-t border-zinc-200 pt-4">
                   <label className="text-xs font-medium text-zinc-700">
-                    Secondary Interests (Optional · up to 5)
+                    Secondary Interests * (Min 1, {secondaryInterests.length}/5 selected)
                   </label>
                   <div className="flex flex-wrap gap-1.5">
                     {SECONDARY_INTERESTS.map((interest) => {
@@ -584,7 +711,10 @@ export function OnboardingFlow({
                 <div className="flex items-center justify-between gap-4 pt-2">
                   <button
                     type="button"
-                    onClick={() => setStep(2)}
+                    onClick={() => {
+                      setError(null);
+                      setStep(2);
+                    }}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600 hover:text-zinc-950"
                   >
                     <ArrowLeft className="w-4 h-4" />

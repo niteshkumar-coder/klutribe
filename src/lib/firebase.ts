@@ -3,9 +3,25 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { doc, getDocFromServer, getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
-const app = initializeApp(firebaseConfig);
+const envAuthDomain =
+  typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN
+    ? String(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN).trim()
+    : '';
+
+const isRunAppPreview =
+  typeof window !== 'undefined' && window.location.hostname.endsWith('.run.app');
+
+const resolvedConfig =
+  envAuthDomain && !isRunAppPreview
+    ? { ...firebaseConfig, authDomain: envAuthDomain }
+    : firebaseConfig;
+
+const app = initializeApp(resolvedConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
+export const isSameOriginAuth =
+  typeof window !== 'undefined' &&
+  resolvedConfig.authDomain.toLowerCase() === window.location.hostname.toLowerCase();
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 

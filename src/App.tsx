@@ -25,7 +25,13 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { auth, googleProvider, prewarmGooglePopup, testFirestoreConnection } from './lib/firebase';
+import {
+  auth,
+  googleProvider,
+  isSameOriginAuth,
+  prewarmGooglePopup,
+  testFirestoreConnection,
+} from './lib/firebase';
 import {
   checkIsAdmin,
   subscribeCampusEvents,
@@ -157,7 +163,9 @@ export default function App() {
             setAuthErrorCanRetry(true);
             setAuthErrorCanRedirect(false);
             setAuthError(
-              'Aapke Chrome ne cross-site Redirect login session block kar diya hai. Login karne ke liye: (1) Chrome me is site ke Pop-ups Allow karein, (2) toolbar ka Ad/Pop-up blocker extension pause karein (ya Chrome Incognito window me kholen), aur Retry Sign-In dabaein.'
+              isSameOriginAuth
+                ? 'Google redirect complete hua, lekin browser cookies/storage blocked hone se session save nahi hua. Cookies allow karein ya Pop-ups Allow karke Retry Sign-In dabaein.'
+                : 'Aapke Chrome ne cross-site Redirect login session block kar diya hai. Pop-ups Allow karein (ya blocker extension pause karein) aur Retry Sign-In dabaein.'
             );
           }
         }
@@ -269,9 +277,30 @@ export default function App() {
         return;
       }
       if (code === 'auth/popup-blocked') {
+        const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
+        if (isSameOriginAuth && !isInIframe) {
+          try {
+            if (typeof window !== 'undefined') {
+              window.sessionStorage.setItem('klu_redirect_pending', '1');
+            }
+            await signInWithRedirect(auth, googleProvider);
+            return;
+          } catch (redirectErr) {
+            if (typeof window !== 'undefined') {
+              window.sessionStorage.removeItem('klu_redirect_pending');
+            }
+            setAuthErrorCanRetry(true);
+            setAuthError(
+              redirectErr instanceof Error
+                ? redirectErr.message
+                : 'Unable to start Google Sign-In.'
+            );
+            return;
+          }
+        }
         prewarmGooglePopup();
         setAuthErrorCanRetry(true);
-        setAuthErrorCanRedirect(typeof window !== 'undefined' && window.self === window.top);
+        setAuthErrorCanRedirect(!isInIframe && isSameOriginAuth);
         setAuthError(
           'Browser ya extension ne Google Sign-In pop-up block kar diya hai. Is site par Pop-ups Allow karein (ya Ad/Pop-up blocker pause karein) aur Retry Sign-In par click karein.'
         );
@@ -626,7 +655,7 @@ export default function App() {
         <div className="flex-1 lg:pl-64 flex flex-col min-w-0 pb-16 lg:pb-0 bg-[#F4F5F7]">
           {/* Top Bar */}
           <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/95 backdrop-blur-sm">
-            <div className="flex items-center justify-between gap-4 px-4 py-3.5 sm:px-8">
+            <div className="flex items-center justify-between gap-4 px-4 py-3.5 sm:px-8 lg:px-10">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -712,7 +741,7 @@ export default function App() {
           </header>
 
           {/* Page Content */}
-          <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
+          <main className="flex-1 mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-8 lg:px-10 sm:py-8">
             {activeTab === 'dashboard' && (
               <DashboardHome
                 me={me}

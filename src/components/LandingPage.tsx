@@ -162,10 +162,10 @@ export function LandingPage({
       : 'Join the Community';
 
   return (
-    <div className="min-h-screen bg-white text-zinc-950">
+    <div className="min-h-screen w-full overflow-x-clip bg-white text-zinc-950">
       {/* Clean White Header Matching Reference */}
       <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-5 py-3 sm:px-8">
+        <div className="mx-auto flex w-full max-w-[1920px] items-center justify-between gap-6 px-4 py-3 sm:px-6 lg:px-10 xl:px-14 2xl:px-16">
           <div className="flex items-center gap-5 shrink-0">
             <a href="#top" className="inline-flex items-center whitespace-nowrap shrink-0">
               <KluTribeLogo variant="compact" surface="light" />
@@ -173,7 +173,7 @@ export function LandingPage({
             <span className="hidden lg:block h-7 w-px bg-zinc-200" aria-hidden="true" />
           </div>
 
-          <nav className="hidden md:flex items-center gap-7 text-sm">
+          <nav className="hidden md:flex items-center gap-7 xl:gap-9 text-sm">
             <a
               href="#top"
               className="border-b-2 border-[#C8102E] pb-1 font-semibold text-[#C8102E] whitespace-nowrap shrink-0"
@@ -232,7 +232,7 @@ export function LandingPage({
         {/* Crisp Full-Clarity Daylight Campus Hero */}
         <section className="relative overflow-hidden bg-white">
           {/* Right Campus Photo — 100% Sharp & Unobscured on the Right, Soft White Fade Only Under Left Text */}
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-full lg:w-[74%]">
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-full lg:w-[78%] xl:w-[80%]">
             <img
               src={kluDaylightCampusImg}
               alt="KL University engineering campus in bright daylight"
@@ -240,7 +240,7 @@ export function LandingPage({
               className="h-full w-full object-cover object-center opacity-100"
             />
             {/* Localized Left Readability Gradient Only — Right Building 100% Vivid */}
-            <div className="absolute inset-0 bg-gradient-to-r from-white via-white/85 via-24% to-transparent lg:from-white lg:via-white/35 lg:via-16% lg:to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-r from-white via-white/85 via-24% to-transparent lg:from-white lg:via-white/45 lg:via-18% lg:to-transparent" />
             {/* Signature Crimson Diagonal Corner Ribbon */}
             <div
               aria-hidden="true"
@@ -249,7 +249,7 @@ export function LandingPage({
           </div>
 
           {/* Top-Right Vaddeswaram Campus Laurel Emblem over Blue Sky */}
-          <div className="hidden lg:flex pointer-events-none absolute top-7 right-8 z-10 items-center gap-2.5 text-white drop-shadow-[0_2px_8px_rgba(15,23,42,0.45)]">
+          <div className="hidden lg:flex pointer-events-none absolute top-7 right-10 xl:right-14 2xl:right-16 z-10 items-center gap-2.5 text-white drop-shadow-[0_2px_8px_rgba(15,23,42,0.45)]">
             <Award className="w-6 h-6 text-white/95 shrink-0" />
             <div className="text-center leading-tight">
               <p className="text-[11px] font-semibold tracking-wide text-white/95">KL University</p>
@@ -259,14 +259,14 @@ export function LandingPage({
             </div>
           </div>
 
-          <div className="relative z-10 mx-auto max-w-6xl px-5 pt-12 pb-20 sm:px-8 sm:pt-16 sm:pb-24 lg:pt-20 lg:pb-28">
-            <div className="max-w-lg space-y-5">
+          <div className="relative z-10 mx-auto w-full max-w-[1920px] px-4 pt-12 pb-20 sm:px-6 sm:pt-16 sm:pb-24 lg:px-10 lg:pt-20 lg:pb-28 xl:px-14 xl:pt-24 xl:pb-32 2xl:px-16">
+            <div className="max-w-lg xl:max-w-xl space-y-5">
               <p className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/95 px-3.5 py-1.5 text-xs font-semibold text-zinc-800 shadow-xs">
                 <GraduationCap className="h-3.5 w-3.5 text-[#C8102E]" />
                 Official Student Platform of KL University
               </p>
 
-              <h1 className="font-display text-5xl sm:text-6xl font-extrabold tracking-tight leading-[1.02] text-[#0B0F19] text-balance">
+              <h1 className="font-display text-5xl sm:text-6xl xl:text-[68px] font-extrabold tracking-tight leading-[1.02] text-[#0B0F19] text-balance">
                 KLU <span className="text-[#C8102E]">TRIBE</span>
               </h1>
 
@@ -274,7 +274,7 @@ export function LandingPage({
                 Connect · Collaborate · Create · Grow
               </p>
 
-              <p className="max-w-md text-sm sm:text-[15px] leading-relaxed text-zinc-700 bg-white/60 sm:bg-transparent backdrop-blur-[2px] sm:backdrop-blur-none rounded-xl">
+              <p className="max-w-md xl:max-w-lg text-sm sm:text-[15px] leading-relaxed text-zinc-700 bg-white/60 sm:bg-transparent backdrop-blur-[2px] sm:backdrop-blur-none rounded-xl">
                 A unified platform for KL University students to network, build projects, join clubs, discover opportunities, and carry a verified campus pass.
               </p>
 
@@ -330,7 +330,7 @@ export function LandingPage({
         </section>
 
         {/* Floating Rounded Stats Card Overlapping Hero Bottom Edge */}
-        <div className="relative z-20 mx-auto max-w-6xl px-5 sm:px-8 -mt-10 sm:-mt-12">
+        <div className="relative z-20 mx-auto w-full max-w-[1920px] px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-16 -mt-10 sm:-mt-12">
           <div className="rounded-2xl border border-zinc-200/90 bg-white px-5 py-5 sm:px-8 sm:py-6 shadow-[0_20px_50px_-15px_rgba(15,23,42,0.12)] grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
             <div className="flex items-center gap-3.5">
               <Users className="w-6 h-6 text-[#C8102E] shrink-0" />
@@ -386,7 +386,7 @@ export function LandingPage({
 
         {/* EXPLORE KLU TRIBE — Everything You Need, in One Student Platform */}
         <section id="explore-platform" className="border-b border-zinc-200 bg-white pt-14 pb-16 sm:pt-16 sm:pb-20">
-          <div className="mx-auto max-w-6xl px-5 sm:px-8 space-y-10">
+          <div className="mx-auto w-full max-w-[1920px] px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-16 space-y-10">
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
@@ -505,7 +505,7 @@ export function LandingPage({
             className="pointer-events-none hidden lg:block absolute -bottom-8 -right-8 h-32 w-28 -skew-x-[24deg] bg-gradient-to-tr from-[#C8102E] to-[#E11D48]/85"
           />
 
-          <div className="relative z-10 mx-auto max-w-6xl px-5 sm:px-8 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+          <div className="relative z-10 mx-auto w-full max-w-[1920px] px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-16 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
             {/* Left: Framed Bright Student Collaboration Photo with Crimson Corner Wedges */}
             <div className="lg:col-span-5">
               <div className="relative p-2.5">
@@ -520,7 +520,7 @@ export function LandingPage({
                     src={kluStudentsCollabImg}
                     alt="KL University engineering students collaborating over a laptop"
                     referrerPolicy="no-referrer"
-                    className="h-72 sm:h-[345px] w-full object-cover object-center opacity-100"
+                    className="h-72 sm:h-[360px] xl:h-[400px] w-full object-cover object-center opacity-100"
                   />
                   {/* Bottom-Right Diagonal Crimson Corner Ribbon Inside Card */}
                   <div
@@ -616,7 +616,7 @@ export function LandingPage({
         {/* Choose Your Student Path + Highlight Strip */}
         <section id="paths" className="relative overflow-hidden border-b border-zinc-200 bg-white py-16 sm:py-20">
           {/* Bright Daylight KL Campus Building Backdrop on Top-Right */}
-          <div className="pointer-events-none hidden lg:block absolute top-0 right-0 h-44 w-[460px] xl:w-[540px] overflow-hidden">
+          <div className="pointer-events-none hidden lg:block absolute top-0 right-0 h-44 w-[480px] xl:w-[620px] overflow-hidden">
             <img
               src={kluDaylightCampusImg}
               alt=""
@@ -627,7 +627,7 @@ export function LandingPage({
             <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent" />
           </div>
 
-          <div className="relative z-10 mx-auto max-w-6xl px-5 sm:px-8 space-y-9">
+          <div className="relative z-10 mx-auto w-full max-w-[1920px] px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-16 space-y-9">
             <div className="flex flex-col lg:flex-row lg:items-center gap-6 lg:pr-64">
               <div className="space-y-2 max-w-md shrink-0">
                 <div className="flex items-center gap-3">
@@ -648,7 +648,7 @@ export function LandingPage({
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 xl:gap-5">
               {ARCHETYPES.map((arch) => {
                 const Icon = PATH_ICONS[arch.id];
                 const bgImg = PATH_IMAGES[arch.id];
@@ -659,7 +659,7 @@ export function LandingPage({
                     key={arch.id}
                     type="button"
                     onClick={() => setPreviewArchetype(arch.id)}
-                    className={`group relative overflow-hidden rounded-2xl p-4 text-left transition-all flex flex-col justify-between min-h-[268px] ${
+                    className={`group relative overflow-hidden rounded-2xl p-4 text-left transition-all flex flex-col justify-between min-h-[268px] xl:min-h-[300px] ${
                       selected
                         ? 'border-2 border-[#C8102E] ring-4 ring-rose-500/20 shadow-lg'
                         : 'border border-zinc-200 hover:border-zinc-400 shadow-sm hover:shadow-md'
@@ -783,7 +783,7 @@ export function LandingPage({
             <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent" />
           </div>
 
-          <div className="relative z-10 mx-auto max-w-6xl px-5 sm:px-8 space-y-9">
+          <div className="relative z-10 mx-auto w-full max-w-[1920px] px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-16 space-y-9">
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
               <div className="flex items-stretch gap-4 max-w-xl">
                 <span className="w-1 rounded-full bg-[#C8102E] shrink-0" aria-hidden="true" />
@@ -889,7 +889,7 @@ export function LandingPage({
         {/* Privacy Promise — Full-Clarity Crimson Shield + Campus Showcase */}
         <section id="privacy" className="relative overflow-hidden border-b border-zinc-200 bg-white py-16 sm:py-20">
           {/* Bright Daylight Campus + Crimson Padlock Shield Artwork on Right */}
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-full lg:w-[68%] overflow-hidden">
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-full lg:w-[72%] xl:w-[75%] overflow-hidden">
             <img
               src={privacyShieldImg}
               alt="KL University privacy security shield with padlock"
@@ -905,7 +905,7 @@ export function LandingPage({
             />
           </div>
 
-          <div className="relative z-10 mx-auto max-w-6xl px-5 sm:px-8">
+          <div className="relative z-10 mx-auto w-full max-w-[1920px] px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-16">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
               {/* Left Copy & Guarantee Chips */}
               <div className="lg:col-span-5 space-y-5">
@@ -942,7 +942,7 @@ export function LandingPage({
               {/* Right Staggered Floating Security Cards Leaving Center Crimson Shield Clear */}
               <div className="lg:col-span-7 relative">
                 {/* Desktop Staggered Layout */}
-                <div className="hidden lg:block relative h-[330px] w-full">
+                <div className="hidden lg:block relative h-[330px] w-full max-w-2xl ml-auto">
                   <div className="absolute top-3 left-2 w-56 rounded-2xl border border-white bg-white/90 backdrop-blur-md p-4 space-y-2 shadow-[0_18px_40px_-15px_rgba(15,23,42,0.18)]">
                     <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-[#C8102E]">
                       <EyeOff className="h-5 w-5" />
@@ -1057,7 +1057,7 @@ export function LandingPage({
 
       {/* Quiet White Footer */}
       <footer className="bg-white py-10">
-        <div className="mx-auto max-w-6xl px-5 sm:px-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-zinc-500">
+        <div className="mx-auto w-full max-w-[1920px] px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-16 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-zinc-500">
           <div className="space-y-2.5">
             <KluTribeLogo variant="full" surface="light" />
             <p>KL University B.Tech Community · Vaddeswaram, Andhra Pradesh</p>
