@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
@@ -11,6 +11,7 @@ import {
   BookOpen,
   Brain,
   Briefcase,
+  Camera,
   Check,
   ChevronDown,
   Clapperboard,
@@ -41,7 +42,9 @@ import {
   Star,
   Target,
   Terminal,
+  Trash2,
   Trophy,
+  Upload,
   User,
   Users,
   type LucideIcon,
@@ -50,6 +53,7 @@ import {
   extractStudentIdFromAuthEmail,
   isStudentIdAuthEmail,
 } from '../lib/firebase';
+import { processProfilePhotoFile } from '../lib/imageUtils';
 import {
   createStudentAccount,
   fetchStudentProfile,
@@ -213,6 +217,10 @@ export function OnboardingFlow({
   const presetStudentId = extractStudentIdFromAuthEmail(email);
 
   // Step 1: Student Verification + Core Academic Details (all compulsory)
+  const [avatarDataUrl, setAvatarDataUrl] = useState('');
+  const [photoProcessing, setPhotoProcessing] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [fullName, setFullName] = useState('');
   const [kluStudentId, setKluStudentId] = useState(presetStudentId || '');
   const [contactEmail, setContactEmail] = useState(isStudentIdLogin ? '' : email);
@@ -302,7 +310,30 @@ export function OnboardingFlow({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handlePhotoSelected = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setPhotoProcessing(true);
+    setPhotoError(null);
+    try {
+      const processed = await processProfilePhotoFile(file);
+      setAvatarDataUrl(processed);
+      setError(null);
+    } catch (err) {
+      setPhotoError(
+        err instanceof Error ? err.message : 'Unable to process photo. Please try another JPG or PNG.'
+      );
+    } finally {
+      setPhotoProcessing(false);
+    }
+  };
+
   const validateStep1 = (): boolean => {
+    if (!avatarDataUrl) {
+      setError('Upload your profile photo so it appears on your profile, Tribe Pass card, and badge.');
+      return false;
+    }
     if (!isFullNameValid) {
       setError('Enter your full name (at least 2 characters).');
       return false;
@@ -461,6 +492,7 @@ export function OnboardingFlow({
         startupInterest,
         startupIdeaSummary: startupInterest ? startupIdeaSummary : '',
         roadmap: DEFAULT_ROADMAP,
+        avatarDataUrl,
       });
       onComplete();
     } catch (err) {
@@ -729,6 +761,108 @@ export function OnboardingFlow({
 
                 {/* Form Inputs */}
                 <div className="space-y-4">
+                  {/* Profile Photo Upload (Shown on Profile, Tribe Pass Card & Badge) */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="block text-xs sm:text-sm font-semibold text-zinc-800">
+                        Profile Photo <span className="text-[#C8102E]">*</span>{' '}
+                        <span className="font-medium text-zinc-500">
+                          (Shown on your Profile, Card &amp; Badge)
+                        </span>
+                      </label>
+                      {avatarDataUrl && <ValidBadge />}
+                    </div>
+
+                    <div
+                      className={`rounded-2xl border p-4 transition-all ${
+                        avatarDataUrl
+                          ? 'border-emerald-200 bg-emerald-50/40'
+                          : 'border-dashed border-rose-300 bg-[#FFF8F9]'
+                      }`}
+                    >
+                      <input
+                        ref={photoInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handlePhotoSelected}
+                        className="hidden"
+                      />
+
+                      <div className="flex flex-col sm:flex-row items-center gap-4">
+                        <button
+                          type="button"
+                          onClick={() => photoInputRef.current?.click()}
+                          disabled={photoProcessing}
+                          className="group relative h-20 w-20 sm:h-24 sm:w-24 shrink-0 overflow-hidden rounded-2xl border-2 border-white bg-white shadow-md focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+                          aria-label="Upload profile photo"
+                        >
+                          {avatarDataUrl ? (
+                            <img
+                              src={avatarDataUrl}
+                              alt="Profile preview"
+                              className="h-full w-full object-cover object-top"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-rose-50 text-[#C8102E]">
+                              <Camera className="w-6 h-6" />
+                              <span className="text-[10px] font-bold">Add Photo</span>
+                            </div>
+                          )}
+                          <span className="absolute bottom-1 right-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#C8102E] text-white shadow-sm group-hover:scale-105 transition-transform">
+                            <Camera className="w-3.5 h-3.5" />
+                          </span>
+                        </button>
+
+                        <div className="flex-1 text-center sm:text-left space-y-2 min-w-0">
+                          <div>
+                            <p className="text-xs sm:text-sm font-bold text-zinc-900">
+                              {avatarDataUrl
+                                ? 'Photo ready for your Profile & Tribe Pass!'
+                                : 'Upload a clear portrait photo'}
+                            </p>
+                            <p className="text-[11px] sm:text-xs text-zinc-600 mt-0.5 leading-relaxed">
+                              This photo appears on your KLU TRIBE profile, digital Tribe Pass card, and campus badge. JPG, PNG or WebP (auto-cropped).
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                            <button
+                              type="button"
+                              onClick={() => photoInputRef.current?.click()}
+                              disabled={photoProcessing}
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-[#C8102E] px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#A30D25] transition-colors disabled:opacity-60"
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                              {photoProcessing
+                                ? 'Processing...'
+                                : avatarDataUrl
+                                  ? 'Change Photo'
+                                  : 'Upload Photo'}
+                            </button>
+
+                            {avatarDataUrl && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAvatarDataUrl('');
+                                  setPhotoError(null);
+                                }}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 hover:border-red-300 hover:text-[#C8102E] transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                Remove
+                              </button>
+                            )}
+                          </div>
+
+                          {photoError && (
+                            <p className="text-xs font-medium text-red-600">{photoError}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Full Name */}
                   <div className="space-y-1.5">
                     <label className="block text-xs sm:text-sm font-semibold text-zinc-800">

@@ -17,6 +17,7 @@ import {
   Trophy,
 } from 'lucide-react';
 import { getArchetypeMeta, type StudentPublic } from '../types/klu';
+import { isValidAvatarDataUrl } from '../lib/imageUtils';
 import { KluTribeLogo } from './KluTribeLogo';
 import kluDaylightCampusImg from '../assets/images/klu_daylight_campus_1794679733683.jpg';
 import titaniumCardSurfaceImg from '../assets/images/titanium_card_surface_1794551683597.jpg';
@@ -57,6 +58,9 @@ export function TribePassCard({
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase() || '')
       .join('') || 'KL';
+
+  const resolvedAvatar =
+    avatarUrl || (isValidAvatarDataUrl(student.avatarDataUrl) ? student.avatarDataUrl : '');
 
   const handleDownloadCard = async () => {
     if (!cardRef.current) return;
@@ -195,9 +199,9 @@ export function TribePassCard({
             {/* Student Portrait + Basic Identity */}
             <div className="flex sm:flex-col items-center sm:items-start gap-4 sm:gap-3">
               <div className="relative h-20 w-20 sm:h-24 sm:w-24 shrink-0 overflow-hidden rounded-2xl border-2 border-white bg-zinc-100 shadow-md">
-                {avatarUrl ? (
+                {resolvedAvatar ? (
                   <img
-                    src={avatarUrl}
+                    src={resolvedAvatar}
                     alt={student.fullName}
                     referrerPolicy="no-referrer"
                     className="h-full w-full object-cover object-top"
@@ -379,14 +383,30 @@ export function TribePassCard({
             </div>
 
             <div className="relative z-10 space-y-14">
-              <div>
-                <p className="text-2xl text-zinc-400">Student Member</p>
-                <h2 className="mt-3 font-display text-7xl font-bold tracking-tight leading-tight">
-                  {student.fullName}
-                </h2>
-                <p className="mt-5 text-3xl text-zinc-300">
-                  B.Tech {student.branch} · {student.year}
-                </p>
+              <div className="flex items-center gap-10">
+                <div className="h-44 w-44 shrink-0 overflow-hidden rounded-3xl border-4 border-white/25 bg-zinc-900 shadow-2xl">
+                  {resolvedAvatar ? (
+                    <img
+                      src={resolvedAvatar}
+                      alt={student.fullName}
+                      referrerPolicy="no-referrer"
+                      className="h-full w-full object-cover object-top"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#C8102E] to-[#881337] font-display text-6xl font-bold text-white">
+                      {initials}
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-2xl text-zinc-400">Student Member</p>
+                  <h2 className="mt-3 font-display text-7xl font-bold tracking-tight leading-tight">
+                    {student.fullName}
+                  </h2>
+                  <p className="mt-5 text-3xl text-zinc-300">
+                    B.Tech {student.branch} · {student.year}
+                  </p>
+                </div>
               </div>
 
               <div className="border-t border-white/15 pt-12">

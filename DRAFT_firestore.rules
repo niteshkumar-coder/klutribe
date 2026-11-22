@@ -76,7 +76,7 @@ service cloud.firestore {
           'primaryCategory', 'secondaryInterests', 'skills', 'bio', 'careerGoal',
           'startupInterest', 'startupIdeaSummary', 'campusMode', 'verificationStatus',
           'isSuspended', 'allowConnections', 'roadmap', 'categoryUpdatedAtMs',
-          'createdAt', 'updatedAt'
+          'avatarDataUrl', 'createdAt', 'updatedAt'
         ])
         && isValidId(data.uid)
         && data.memberNumber is string && data.memberNumber.size() >= 5 && data.memberNumber.size() <= 20 && data.memberNumber.matches('^KLU-[0-9]{6}$')
@@ -98,6 +98,11 @@ service cloud.firestore {
         && data.allowConnections is bool
         && data.roadmap is list && data.roadmap.size() <= 4 && (data.roadmap.size() == 0 || data.roadmap[0] is map)
         && data.categoryUpdatedAtMs is number && data.categoryUpdatedAtMs >= 0
+        && (!('avatarDataUrl' in data) || (
+          data.avatarDataUrl is string
+          && data.avatarDataUrl.size() <= 140000
+          && (data.avatarDataUrl == '' || (data.avatarDataUrl.size() > 23 && data.avatarDataUrl[0:23] == 'data:image/jpeg;base64,'))
+        ))
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
@@ -303,7 +308,7 @@ service cloud.firestore {
             'fullName', 'maskedStudentId', 'branch', 'year', 'batch', 'primaryCategory',
             'secondaryInterests', 'skills', 'bio', 'careerGoal', 'startupInterest',
             'startupIdeaSummary', 'campusMode', 'allowConnections', 'roadmap',
-            'categoryUpdatedAtMs', 'updatedAt'
+            'categoryUpdatedAtMs', 'avatarDataUrl', 'updatedAt'
           ])
         ) || (
           isAdmin()

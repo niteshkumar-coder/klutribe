@@ -16,6 +16,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './firebase';
+import { isValidAvatarDataUrl } from './imageUtils';
 import {
   ADMIN_BOOTSTRAP_EMAIL,
   type AcademicYear,
@@ -198,6 +199,7 @@ export interface OnboardingPayload {
   startupInterest: boolean;
   startupIdeaSummary: string;
   roadmap: RoadmapYear[];
+  avatarDataUrl?: string;
 }
 
 export async function createStudentAccount(payload: OnboardingPayload): Promise<void> {
@@ -237,6 +239,7 @@ export async function createStudentAccount(payload: OnboardingPayload): Promise<
       allowConnections: true,
       roadmap: payload.roadmap.slice(0, 4),
       categoryUpdatedAtMs: Date.now(),
+      avatarDataUrl: isValidAvatarDataUrl(payload.avatarDataUrl) ? payload.avatarDataUrl : '',
       createdAt: now,
       updatedAt: now,
     };
@@ -295,6 +298,7 @@ export async function updateStudentProfile(
       | 'allowConnections'
       | 'roadmap'
       | 'categoryUpdatedAtMs'
+      | 'avatarDataUrl'
     >
   >
 ): Promise<void> {
@@ -319,6 +323,9 @@ export async function updateStudentProfile(
     if (updates.allowConnections !== undefined) sanitized.allowConnections = Boolean(updates.allowConnections);
     if (updates.roadmap !== undefined) sanitized.roadmap = updates.roadmap.slice(0, 4);
     if (updates.categoryUpdatedAtMs !== undefined) sanitized.categoryUpdatedAtMs = updates.categoryUpdatedAtMs;
+    if (updates.avatarDataUrl !== undefined) {
+      sanitized.avatarDataUrl = isValidAvatarDataUrl(updates.avatarDataUrl) ? updates.avatarDataUrl : '';
+    }
 
     await updateDoc(doc(db, 'students', uid), sanitized);
 

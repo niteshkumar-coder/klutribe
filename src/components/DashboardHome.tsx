@@ -23,6 +23,7 @@ import {
   type RoadmapYear,
   type StudentPublic,
 } from '../types/klu';
+import { StudentAvatar } from './StudentAvatar';
 import kluDaylightCampusImg from '../assets/images/klu_daylight_campus_1794679733683.jpg';
 
 interface DashboardHomeProps {
@@ -50,14 +51,6 @@ export function DashboardHome({
   const pendingIncoming = connections.filter((c) => c.status === 'pending' && c.toUid === me.uid);
   const myEventsCount = events.filter((ev) => ev.attendeeUids.includes(me.uid)).length;
   const completedYears = roadmap.filter((r) => r.completed).length;
-
-  const initials =
-    me.fullName
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() || '')
-      .join('') || 'KL';
 
   const connectedOrPendingUids = new Set(
     connections.flatMap((c) => c.participantUids)
@@ -132,9 +125,13 @@ export function DashboardHome({
 
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="h-14 w-14 rounded-full border-2 border-white bg-gradient-to-br from-[#C8102E] to-[#881337] flex items-center justify-center font-display text-lg font-bold text-white shadow-sm shrink-0">
-              {initials}
-            </div>
+            <StudentAvatar
+              name={me.fullName}
+              avatarDataUrl={me.avatarDataUrl}
+              size="lg"
+              shape="circle"
+              className="border-2 border-white shadow-sm"
+            />
             <div>
               <p className="text-xs font-medium text-zinc-500">Welcome back,</p>
               <h1 className="font-display text-2xl font-bold tracking-tight text-zinc-950">
@@ -337,21 +334,30 @@ export function DashboardHome({
             <h2 className="font-display text-base font-bold text-zinc-950">Your Tribe Pass</h2>
 
             <div className="relative overflow-hidden rounded-2xl border border-amber-300/80 bg-gradient-to-br from-[#FEF3C7] via-[#FDE68A] to-[#F59E0B]/80 p-5 text-zinc-950 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-950">
-                    <Crown className="w-4 h-4 text-amber-700" />
-                    KLU TRIBE
-                  </span>
-                  <p className="font-display text-lg font-bold text-zinc-950">
-                    {me.verificationStatus === 'verified' ? 'Verified Member' : 'Tribe Member'}
-                  </p>
-                  <p className="font-mono text-xs font-semibold text-amber-950/80">
-                    #{me.memberNumber} · {me.maskedStudentId}
-                  </p>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <StudentAvatar
+                    name={me.fullName}
+                    avatarDataUrl={me.avatarDataUrl}
+                    size="md"
+                    shape="rounded"
+                    className="h-12 w-12 border-2 border-white shadow-sm"
+                  />
+                  <div className="space-y-0.5 min-w-0">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-950">
+                      <Crown className="w-3.5 h-3.5 text-amber-700" />
+                      KLU TRIBE
+                    </span>
+                    <p className="font-display text-base font-bold text-zinc-950 truncate">
+                      {me.fullName}
+                    </p>
+                    <p className="font-mono text-[11px] font-semibold text-amber-950/80 truncate">
+                      #{me.memberNumber} · {me.verificationStatus === 'verified' ? 'Verified' : 'Member'}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="rounded-xl bg-white p-1.5 shadow-xs text-[10px] font-mono font-bold text-zinc-900">
+                <div className="rounded-xl bg-white px-2 py-1.5 shadow-xs text-[10px] font-mono font-bold text-zinc-900 shrink-0">
                   {me.branch} · {me.year.split(' ')[0]}
                 </div>
               </div>
@@ -391,14 +397,23 @@ export function DashboardHome({
                   return (
                     <div key={student.uid} className="py-3 first:pt-0 last:pb-0 space-y-1.5">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="font-semibold text-sm text-zinc-950 truncate">
-                            {student.fullName}
-                          </p>
-                          <p className="text-xs text-zinc-500">
-                            {student.branch} · {student.year} ·{' '}
-                            <span style={{ color: peerArch.accentHex }}>{peerArch.subtitle}</span>
-                          </p>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <StudentAvatar
+                            name={student.fullName}
+                            avatarDataUrl={student.avatarDataUrl}
+                            size="sm"
+                            shape="circle"
+                            className="border border-zinc-200"
+                          />
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm text-zinc-950 truncate">
+                              {student.fullName}
+                            </p>
+                            <p className="text-xs text-zinc-500">
+                              {student.branch} · {student.year} ·{' '}
+                              <span style={{ color: peerArch.accentHex }}>{peerArch.subtitle}</span>
+                            </p>
+                          </div>
                         </div>
                         <button
                           type="button"

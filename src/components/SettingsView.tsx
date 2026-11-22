@@ -1,11 +1,13 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { Lock, Save } from 'lucide-react';
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { Camera, Lock, Save, Trash2, Upload } from 'lucide-react';
 import { auth, isStudentIdAuthEmail } from '../lib/firebase';
+import { processProfilePhotoFile } from '../lib/imageUtils';
 import {
   fetchStudentPrivate,
   updateStudentPrivateInfo,
   updateStudentProfile,
 } from '../lib/kluService';
+import { StudentAvatar } from './StudentAvatar';
 import {
   ACADEMIC_YEARS,
   ARCHETYPES,
@@ -39,6 +41,9 @@ export function SettingsView({ me }: SettingsViewProps) {
   const [startupIdeaSummary, setStartupIdeaSummary] = useState(me.startupIdeaSummary);
   const [campusMode, setCampusMode] = useState<CampusMode>(me.campusMode);
   const [allowConnections, setAllowConnections] = useState(me.allowConnections);
+  const [avatarDataUrl, setAvatarDataUrl] = useState(me.avatarDataUrl || '');
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const [privateInfo, setPrivateInfo] = useState<StudentPrivate | null>(null);
   const [phone, setPhone] = useState('');
@@ -48,6 +53,10 @@ export function SettingsView({ me }: SettingsViewProps) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAvatarDataUrl(me.avatarDataUrl || '');
+  }, [me.avatarDataUrl]);
 
   const msSinceLastCategoryChange = Date.now() - (me.categoryUpdatedAtMs || 0);
   const canSwitchCategory = msSinceLastCategoryChange >= NINETY_DAYS_MS || me.categoryUpdatedAtMs === 0;
@@ -79,6 +88,42 @@ export function SettingsView({ me }: SettingsViewProps) {
     );
   };
 
+  const handlePhotoChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setPhotoUploading(true);
+    setErrorMessage(null);
+    setMessage(null);
+    try {
+      const processed = await processProfilePhotoFile(file);
+      setAvatarDataUrl(processed);
+      await updateStudentProfile(me.uid, { avatarDataUrl: processed });
+      setMessage('Profile photo updated across your Profile, Tribe Pass card, and badge.');
+      setTimeout(() => setMessage(null), 3500);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Unable to upload profile photo.');
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    setPhotoUploading(true);
+    setErrorMessage(null);
+    setMessage(null);
+    try {
+      setAvatarDataUrl('');
+      await updateStudentProfile(me.uid, { avatarDataUrl: '' });
+      setMessage('Profile photo removed.');
+      setTimeout(() => setMessage(null), 3000);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Unable to remove profile photo.');
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
   const handleSavePublic = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -98,6 +143,7 @@ export function SettingsView({ me }: SettingsViewProps) {
         startupIdeaSummary,
         campusMode,
         allowConnections,
+        avatarDataUrl,
         ...(categoryChanged && canSwitchCategory
           ? { primaryCategory, categoryUpdatedAtMs: Date.now() }
           : {}),
@@ -151,6 +197,72 @@ export function SettingsView({ me }: SettingsViewProps) {
 
       <form onSubmit={handleSavePublic} className="rounded-2xl border border-zinc-200/90 bg-white p-6 space-y-6 shadow-xs">
         <h2 className="font-display text-lg font-semibold text-zinc-950">Public Profile & Path</h2>
+
+        {/* Profile & Tribe Pass Photo */}
+        <div className="rounded-2xl border border-zinc-200 bg-[#FAFAFA] p-4 flex flex-col sm:flex-row items-center gap-4">
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handlePhotoChange}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => photoInputRef.current?.click()}
+            disabled={photoUploading}
+            className="relative group rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+            aria-label="Change profile photo"
+          >
+            <StudentAvatar
+              name={fullName || me.fullName}
+              avatarDataUrl={avatarDataUrl}
+              size="xl"
+              shape="rounded"
+              className="border-2 border-white shadow-sm"
+            />
+            <span className="absolute -bottom-1 -right-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#C8102E] text-white shadow-sm group-hover:scale-105 transition-transform">
+              <Camera className="w-3.5 h-3.5" />
+            </span>
+          </button>
+
+          <div className="flex-1 text-center sm:text-left space-y-2">
+            <div>
+              <p className="text-xs font-bold text-zinc-900">
+                Profile, Tribe Pass Card &amp; Badge Photo
+              </p>
+              <p className="text-[11px] text-zinc-600 mt-0.5">
+                Upload a clear portrait photo (JPG, PNG or WebP). It updates immediately on your Profile, Tribe Pass card, and campus badges.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={photoUploading}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#C8102E] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#A30D25] transition-colors disabled:opacity-60"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                {photoUploading
+                  ? 'Uploading...'
+                  : avatarDataUrl
+                    ? 'Change Photo'
+                    : 'Upload Photo'}
+              </button>
+              {avatarDataUrl && (
+                <button
+                  type="button"
+                  onClick={handleRemovePhoto}
+                  disabled={photoUploading}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs font-medium text-zinc-700 hover:border-red-300 hover:text-[#C8102E] transition-colors disabled:opacity-60"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-1">

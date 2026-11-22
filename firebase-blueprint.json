@@ -25,6 +25,7 @@
         "allowConnections": { "type": "boolean" },
         "roadmap": { "type": "array" },
         "categoryUpdatedAtMs": { "type": "number" },
+        "avatarDataUrl": { "type": "string", "maxLength": 140000 },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },

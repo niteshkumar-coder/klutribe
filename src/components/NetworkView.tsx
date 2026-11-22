@@ -25,6 +25,7 @@ import {
   type DirectMessage,
   type StudentPublic,
 } from '../types/klu';
+import { StudentAvatar } from './StudentAvatar';
 
 interface NetworkViewProps {
   me: StudentPublic;
@@ -261,20 +262,29 @@ export function NetworkView({ me, students, connections }: NetworkViewProps) {
                     className="flex flex-col justify-between rounded-2xl border border-zinc-200/90 bg-white p-5 space-y-4 shadow-xs"
                   >
                     <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <h3 className="font-display text-base font-semibold text-zinc-950 truncate">
-                              {student.fullName}
-                            </h3>
-                            {student.verificationStatus === 'verified' && (
-                              <ShieldCheck className="w-4 h-4 text-[#C8102E] shrink-0" />
-                            )}
+                      <div className="flex items-start justify-between gap-2.5">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <StudentAvatar
+                            name={student.fullName}
+                            avatarDataUrl={student.avatarDataUrl}
+                            size="md"
+                            shape="rounded"
+                            className="border border-zinc-200 shadow-xs"
+                          />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <h3 className="font-display text-base font-semibold text-zinc-950 truncate">
+                                {student.fullName}
+                              </h3>
+                              {student.verificationStatus === 'verified' && (
+                                <ShieldCheck className="w-4 h-4 text-[#C8102E] shrink-0" />
+                              )}
+                            </div>
+                            <p className="text-xs text-zinc-500">
+                              {student.branch} · {student.year}
+                              {student.campusMode ? ` · ${student.campusMode}` : ''}
+                            </p>
                           </div>
-                          <p className="text-xs text-zinc-500">
-                            {student.branch} · {student.year}
-                            {student.campusMode ? ` · ${student.campusMode}` : ''}
-                          </p>
                         </div>
                         <span className="font-mono text-[11px] text-zinc-400 shrink-0">
                           #{student.memberNumber}
@@ -506,11 +516,22 @@ export function NetworkView({ me, students, connections }: NetworkViewProps) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
           <div className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white shadow-2xl p-6 space-y-5">
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="font-display text-xl font-bold text-zinc-950">{selectedStudent.fullName}</h2>
-                <p className="text-xs text-zinc-500">
-                  B.Tech {selectedStudent.branch} · {selectedStudent.year} · #{selectedStudent.memberNumber}
-                </p>
+              <div className="flex items-center gap-3.5 min-w-0">
+                <StudentAvatar
+                  name={selectedStudent.fullName}
+                  avatarDataUrl={selectedStudent.avatarDataUrl}
+                  size="lg"
+                  shape="rounded"
+                  className="border border-zinc-200 shadow-xs"
+                />
+                <div className="min-w-0">
+                  <h2 className="font-display text-xl font-bold text-zinc-950 truncate">
+                    {selectedStudent.fullName}
+                  </h2>
+                  <p className="text-xs text-zinc-500">
+                    B.Tech {selectedStudent.branch} · {selectedStudent.year} · #{selectedStudent.memberNumber}
+                  </p>
+                </div>
               </div>
               <button
                 type="button"

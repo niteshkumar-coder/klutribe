@@ -4,6 +4,7 @@ import { fetchPublicPassByMemberNumber } from '../lib/kluService';
 import { getArchetypeMeta, type StudentPublic } from '../types/klu';
 import { TribePassCard } from './TribePassCard';
 import { KluTribeLogo } from './KluTribeLogo';
+import { StudentAvatar } from './StudentAvatar';
 
 interface PublicPassViewProps {
   memberNumber: string;
@@ -59,14 +60,23 @@ export function PublicPassView({ memberNumber, onExit }: PublicPassViewProps) {
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="font-display text-2xl font-bold tracking-tight text-zinc-950">
-                  {student.fullName}
-                </h1>
-                <p className="mt-1 text-sm text-zinc-600">
-                  B.Tech {student.branch} · {student.year} · {getArchetypeMeta(student.primaryCategory).name}
-                </p>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <StudentAvatar
+                  name={student.fullName}
+                  avatarDataUrl={student.avatarDataUrl}
+                  size="lg"
+                  shape="rounded"
+                  className="border-2 border-white shadow-sm"
+                />
+                <div className="min-w-0">
+                  <h1 className="font-display text-2xl font-bold tracking-tight text-zinc-950 truncate">
+                    {student.fullName}
+                  </h1>
+                  <p className="mt-1 text-sm text-zinc-600">
+                    B.Tech {student.branch} · {student.year} · {getArchetypeMeta(student.primaryCategory).name}
+                  </p>
+                </div>
               </div>
               {student.verificationStatus === 'verified' ? (
                 <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#C8102E]">

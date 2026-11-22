@@ -84,6 +84,7 @@ import { CampusView } from './components/CampusView';
 import { LeaderboardView } from './components/LeaderboardView';
 import { SettingsView } from './components/SettingsView';
 import { AdminDashboardView } from './components/AdminDashboardView';
+import { StudentAvatar } from './components/StudentAvatar';
 
 type WorkspaceTab =
   | 'dashboard'
@@ -820,10 +821,23 @@ export default function App() {
           </nav>
 
           <div className="border-t border-zinc-800 p-4 space-y-2.5">
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-white truncate">{me.fullName}</p>
-              <p className="font-mono text-[11px] text-zinc-400">#{me.memberNumber}</p>
-            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('pass')}
+              className="w-full flex items-center gap-2.5 text-left rounded-xl p-1 -m-1 hover:bg-white/5 transition-colors min-w-0"
+            >
+              <StudentAvatar
+                name={me.fullName}
+                avatarDataUrl={me.avatarDataUrl}
+                size="sm"
+                shape="circle"
+                className="border border-zinc-700"
+              />
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-white truncate">{me.fullName}</p>
+                <p className="font-mono text-[11px] text-zinc-400">#{me.memberNumber}</p>
+              </div>
+            </button>
             <button
               type="button"
               onClick={() => setShowLanding(true)}
@@ -954,9 +968,16 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setActiveTab('pass')}
-                  className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-[#FAFAFA] px-3 py-1.5 text-xs font-medium text-zinc-800 hover:border-zinc-300 hover:bg-white whitespace-nowrap shrink-0"
+                  className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-[#FAFAFA] pl-1.5 pr-3 py-1 text-xs font-medium text-zinc-800 hover:border-zinc-300 hover:bg-white whitespace-nowrap shrink-0"
                 >
-                  {me.fullName.split(' ')[0]} · #{me.memberNumber}
+                  <StudentAvatar
+                    name={me.fullName}
+                    avatarDataUrl={me.avatarDataUrl}
+                    size="xs"
+                    shape="circle"
+                    className="border border-zinc-200"
+                  />
+                  <span>{me.fullName.split(' ')[0]} · #{me.memberNumber}</span>
                 </button>
 
                 {showNotifications && (

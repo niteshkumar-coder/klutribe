@@ -46,6 +46,7 @@ export interface StudentPublic {
   allowConnections: boolean;
   roadmap: RoadmapYear[];
   categoryUpdatedAtMs: number;
+  avatarDataUrl?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
