@@ -213,7 +213,7 @@ export function OnboardingFlow({
   const presetStudentId = extractStudentIdFromAuthEmail(email);
 
   // Step 1: Student Verification + Core Academic Details (all compulsory)
-  const [fullName, setFullName] = useState(displayName || '');
+  const [fullName, setFullName] = useState('');
   const [kluStudentId, setKluStudentId] = useState(presetStudentId || '');
   const [contactEmail, setContactEmail] = useState(isStudentIdLogin ? '' : email);
   const [branch, setBranch] = useState<Branch | ''>('');
@@ -744,7 +744,7 @@ export function OnboardingFlow({
                         maxLength={80}
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
-                        placeholder="e.g. Nitesh Kumar"
+                        placeholder="Enter your full name"
                         className="w-full bg-transparent px-3.5 py-2.5 text-sm font-medium text-zinc-950 placeholder:text-zinc-400 focus:outline-none"
                       />
                       {isFullNameValid && (
