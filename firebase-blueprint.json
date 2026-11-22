@@ -210,6 +210,23 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["adminUid", "adminEmail", "action", "targetId", "details", "createdAt"]
+    },
+    "StudentIdRegistry": {
+      "title": "StudentIdRegistry",
+      "description": "Zero-PII lookup index mapping a normalized KL University Student ID to its owning student UID and public summary to prevent duplicate profiles and auto-surface existing profiles.",
+      "type": "object",
+      "properties": {
+        "kluStudentId": { "type": "string", "minLength": 6, "maxLength": 20, "pattern": "^[A-Z0-9]+$" },
+        "ownerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberNumber": { "type": "string", "minLength": 5, "maxLength": 20, "pattern": "^KLU-[0-9]{6}$" },
+        "fullName": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "branch": { "type": "string", "enum": ["CSE", "AI&DS", "CS&IT", "ECE", "EEE", "ME", "CE", "BT"] },
+        "year": { "type": "string", "enum": ["1st Year", "2nd Year", "3rd Year", "4th Year"] },
+        "authMethod": { "type": "string", "enum": ["google", "student_id"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["kluStudentId", "ownerUid", "memberNumber", "fullName", "branch", "year", "authMethod", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -220,6 +237,10 @@
     "/students/{studentId}/private/{docId}": {
       "schema": { "$ref": "#/entities/StudentPrivate" },
       "description": "Isolated PII document containing email, mobile number, gender, and full KLU Student ID."
+    },
+    "/studentIdRegistry/{studentId}": {
+      "schema": { "$ref": "#/entities/StudentIdRegistry" },
+      "description": "Zero-PII unique index keyed by normalized KL University Student ID for duplicate prevention and existing profile detection."
     },
     "/admins/{adminId}": {
       "schema": { "$ref": "#/entities/AdminRecord" },

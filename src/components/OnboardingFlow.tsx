@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
@@ -50,19 +50,26 @@ import {
   extractStudentIdFromAuthEmail,
   isStudentIdAuthEmail,
 } from '../lib/firebase';
-import { createStudentAccount } from '../lib/kluService';
+import {
+  createStudentAccount,
+  fetchStudentProfile,
+  lookupStudentIdRegistry,
+} from '../lib/kluService';
 import {
   ACADEMIC_YEARS,
   ARCHETYPES,
   BRANCHES,
   CURATED_SKILLS,
   DEFAULT_ROADMAP,
+  getArchetypeMeta,
   SECONDARY_INTERESTS,
   type AcademicYear,
   type ArchetypeId,
   type Branch,
   type CampusMode,
   type GenderOption,
+  type StudentIdRegistryRecord,
+  type StudentPublic,
 } from '../types/klu';
 import { KluTribeLogo } from './KluTribeLogo';
 import kluDaylightCampusImg from '../assets/images/klu_daylight_campus_1794679733683.jpg';
@@ -73,6 +80,7 @@ interface OnboardingFlowProps {
   displayName: string;
   onComplete: () => void;
   onSignOut: () => void;
+  onOpenExistingAccount: (registry: StudentIdRegistryRecord) => void;
 }
 
 const ARCHETYPE_ICONS: Record<ArchetypeId, LucideIcon> = {
@@ -190,10 +198,16 @@ export function OnboardingFlow({
   displayName,
   onComplete,
   onSignOut,
+  onOpenExistingAccount,
 }: OnboardingFlowProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkingId, setCheckingId] = useState(false);
+  const [existingMatch, setExistingMatch] = useState<{
+    registry: StudentIdRegistryRecord;
+    profile: StudentPublic | null;
+  } | null>(null);
 
   const isStudentIdLogin = isStudentIdAuthEmail(email);
   const presetStudentId = extractStudentIdFromAuthEmail(email);
@@ -227,6 +241,47 @@ export function OnboardingFlow({
   const isPhoneValid = phoneDigits.length >= 10 && phoneDigits.length <= 15;
   const isCareerGoalValid = careerGoal.trim().length >= 5;
 
+  // Automatically check if entered University ID already has an existing KLU TRIBE profile
+  useEffect(() => {
+    const cleanId = kluStudentId.trim().toUpperCase();
+    if (!/^[A-Z0-9]{6,20}$/.test(cleanId)) {
+      setExistingMatch(null);
+      setCheckingId(false);
+      return;
+    }
+
+    let cancelled = false;
+    setCheckingId(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const reg = await lookupStudentIdRegistry(cleanId);
+        if (cancelled) return;
+        if (reg && reg.ownerUid !== uid) {
+          let profile: StudentPublic | null = null;
+          try {
+            profile = await fetchStudentProfile(reg.ownerUid);
+          } catch {
+            profile = null;
+          }
+          if (!cancelled) {
+            setExistingMatch({ registry: reg, profile });
+          }
+        } else {
+          setExistingMatch(null);
+        }
+      } catch {
+        if (!cancelled) setExistingMatch(null);
+      } finally {
+        if (!cancelled) setCheckingId(false);
+      }
+    }, 320);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [kluStudentId, uid]);
+
   const toggleSkill = (skill: string) => {
     setSkills((prev) =>
       prev.includes(skill) ? prev.filter((s) => s !== skill) : prev.length < 12 ? [...prev, skill] : prev
@@ -254,6 +309,12 @@ export function OnboardingFlow({
     }
     if (!isKluIdValid) {
       setError('Enter a valid KL University Student ID (6–20 alphanumeric characters).');
+      return false;
+    }
+    if (existingMatch) {
+      setError(
+        `University ID "${existingMatch.registry.kluStudentId}" already has an existing KLU TRIBE profile (${existingMatch.registry.fullName}). Open your existing profile above instead of creating a duplicate.`
+      );
       return false;
     }
     if (isStudentIdLogin && !isContactEmailValid) {
@@ -384,6 +445,7 @@ export function OnboardingFlow({
       await createStudentAccount({
         uid,
         email: isStudentIdLogin ? contactEmail.trim() : email,
+        authMethod: isStudentIdLogin ? 'student_id' : 'google',
         fullName,
         kluStudentId,
         branch,
@@ -721,12 +783,73 @@ export function OnboardingFlow({
                           isStudentIdLogin ? 'text-zinc-700 cursor-not-allowed' : 'text-zinc-950'
                         }`}
                       />
-                      {isKluIdValid && (
+                      {isKluIdValid && !existingMatch && !checkingId && (
                         <span className="pr-3">
                           <ValidBadge />
                         </span>
                       )}
                     </div>
+
+                    {checkingId && (
+                      <p className="text-[11px] font-medium text-zinc-500">
+                        Checking KL University ID registry...
+                      </p>
+                    )}
+
+                    {existingMatch && (
+                      <div className="mt-2 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-rose-50/40 p-4 space-y-3 shadow-xs">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-0.5">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-bold text-white">
+                              Existing Profile Found
+                            </span>
+                            <p className="font-display text-base font-extrabold text-zinc-950 pt-1">
+                              {existingMatch.profile?.fullName || existingMatch.registry.fullName}
+                            </p>
+                            <p className="text-xs font-medium text-zinc-600">
+                              <span className="font-mono font-semibold text-[#C8102E]">
+                                #{existingMatch.registry.memberNumber}
+                              </span>{' '}
+                              · B.Tech {existingMatch.registry.branch} · {existingMatch.registry.year}
+                            </p>
+                            {existingMatch.profile && (
+                              <p className="text-xs text-zinc-600 pt-0.5">
+                                Path:{' '}
+                                <strong className="text-zinc-900">
+                                  {getArchetypeMeta(existingMatch.profile.primaryCategory).subtitle}
+                                </strong>
+                                {existingMatch.profile.skills.length > 0 && (
+                                  <> · {existingMatch.profile.skills.slice(0, 3).join(', ')}</>
+                                )}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-zinc-700 leading-relaxed">
+                          This University ID (<strong className="font-mono">{existingMatch.registry.kluStudentId}</strong>) is already registered using{' '}
+                          <strong>
+                            {existingMatch.registry.authMethod === 'google'
+                              ? 'Google Sign-In'
+                              : 'University ID & Password'}
+                          </strong>
+                          . Open your existing profile directly instead of filling the form again.
+                        </p>
+
+                        <button
+                          type="button"
+                          onClick={() => onOpenExistingAccount(existingMatch.registry)}
+                          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#DC143C] via-[#C8102E] to-[#A60C25] px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-xs hover:brightness-105 transition-all"
+                        >
+                          <span>
+                            {existingMatch.registry.authMethod === 'google'
+                              ? 'Open Existing Profile with Google'
+                              : `Login to Existing Profile (${existingMatch.registry.kluStudentId})`}
+                          </span>
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Contact Email (Required when signed in via Student ID) */}

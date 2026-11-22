@@ -9,6 +9,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
   writeBatch,
@@ -34,6 +35,7 @@ import {
   type RoadmapYear,
   type SkillExchange,
   type StartupIdea,
+  type StudentIdRegistryRecord,
   type StudentPrivate,
   type StudentPublic,
   type VerificationStatus,
@@ -121,9 +123,66 @@ export async function fetchStudentPrivate(uid: string): Promise<StudentPrivate |
   }
 }
 
+export function subscribeMyStudentProfile(
+  uid: string,
+  onData: (profile: StudentPublic | null) => void
+): Unsubscribe {
+  const path = `students/${uid}`;
+  return onSnapshot(
+    doc(db, 'students', uid),
+    (snap) => {
+      onData(snap.exists() ? (snap.data() as StudentPublic) : null);
+    },
+    (error) => handleFirestoreError(error, OperationType.GET, path)
+  );
+}
+
+export async function lookupStudentIdRegistry(
+  rawStudentId: string
+): Promise<StudentIdRegistryRecord | null> {
+  const cleanId = rawStudentId.trim().toUpperCase();
+  if (!/^[A-Z0-9]{6,20}$/.test(cleanId)) return null;
+  const path = `studentIdRegistry/${cleanId}`;
+  try {
+    const snap = await getDoc(doc(db, 'studentIdRegistry', cleanId));
+    return snap.exists() ? (snap.data() as StudentIdRegistryRecord) : null;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+  }
+}
+
+export async function ensureStudentIdRegistryForProfile(
+  student: StudentPublic,
+  rawStudentId: string,
+  authMethod: 'google' | 'student_id'
+): Promise<void> {
+  const cleanId = clampStr(rawStudentId.toUpperCase(), 20);
+  if (!/^[A-Z0-9]{6,20}$/.test(cleanId)) return;
+  try {
+    const ref = doc(db, 'studentIdRegistry', cleanId);
+    const existingSnap = await getDoc(ref);
+    if (existingSnap.exists()) return;
+    const now = serverTimestamp();
+    await setDoc(ref, {
+      kluStudentId: cleanId,
+      ownerUid: student.uid,
+      memberNumber: student.memberNumber,
+      fullName: clampStr(student.fullName, 80),
+      branch: student.branch,
+      year: student.year,
+      authMethod,
+      createdAt: now,
+      updatedAt: now,
+    });
+  } catch {
+    // Best-effort silent backfill; ignore if already claimed or offline
+  }
+}
+
 export interface OnboardingPayload {
   uid: string;
   email: string;
+  authMethod: 'google' | 'student_id';
   fullName: string;
   kluStudentId: string;
   branch: Branch;
@@ -143,11 +202,19 @@ export interface OnboardingPayload {
 
 export async function createStudentAccount(payload: OnboardingPayload): Promise<void> {
   const publicPath = `students/${payload.uid}`;
+  const cleanKluId = clampStr(payload.kluStudentId.toUpperCase(), 20);
+
+  const existingRegistry = await lookupStudentIdRegistry(cleanKluId);
+  if (existingRegistry && existingRegistry.ownerUid !== payload.uid) {
+    throw new Error(
+      `This KL University Student ID (${cleanKluId}) is already registered under an existing KLU TRIBE profile.`
+    );
+  }
+
   try {
     const batch = writeBatch(db);
     const now = serverTimestamp();
     const memberNumber = generateMemberNumber(payload.uid);
-    const cleanKluId = clampStr(payload.kluStudentId.toUpperCase(), 20);
 
     const publicDoc: Record<string, unknown> = {
       uid: payload.uid,
@@ -184,8 +251,23 @@ export async function createStudentAccount(payload: OnboardingPayload): Promise<
       updatedAt: now,
     };
 
+    const registryDoc: Record<string, unknown> = {
+      kluStudentId: cleanKluId,
+      ownerUid: payload.uid,
+      memberNumber,
+      fullName: clampStr(payload.fullName, 80),
+      branch: payload.branch,
+      year: payload.year,
+      authMethod: payload.authMethod,
+      createdAt: now,
+      updatedAt: now,
+    };
+
     batch.set(doc(db, 'students', payload.uid), publicDoc);
     batch.set(doc(db, 'students', payload.uid, 'private', 'info'), privateDoc);
+    if (!existingRegistry) {
+      batch.set(doc(db, 'studentIdRegistry', cleanKluId), registryDoc);
+    }
     await batch.commit();
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, publicPath);
@@ -239,6 +321,31 @@ export async function updateStudentProfile(
     if (updates.categoryUpdatedAtMs !== undefined) sanitized.categoryUpdatedAtMs = updates.categoryUpdatedAtMs;
 
     await updateDoc(doc(db, 'students', uid), sanitized);
+
+    // Best-effort sync to studentIdRegistry if display fields changed
+    if (updates.fullName !== undefined || updates.branch !== undefined || updates.year !== undefined) {
+      try {
+        const privSnap = await getDoc(doc(db, 'students', uid, 'private', 'info'));
+        if (privSnap.exists()) {
+          const cleanId = String((privSnap.data() as StudentPrivate).kluStudentId || '')
+            .trim()
+            .toUpperCase();
+          if (/^[A-Z0-9]{6,20}$/.test(cleanId)) {
+            const regRef = doc(db, 'studentIdRegistry', cleanId);
+            const regSnap = await getDoc(regRef);
+            if (regSnap.exists() && (regSnap.data() as StudentIdRegistryRecord).ownerUid === uid) {
+              const regPatch: Record<string, unknown> = { updatedAt: serverTimestamp() };
+              if (updates.fullName !== undefined) regPatch.fullName = clampStr(updates.fullName, 80);
+              if (updates.branch !== undefined) regPatch.branch = updates.branch;
+              if (updates.year !== undefined) regPatch.year = updates.year;
+              await updateDoc(regRef, regPatch);
+            }
+          }
+        }
+      } catch {
+        // Non-blocking registry metadata sync
+      }
+    }
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
   }
@@ -246,11 +353,30 @@ export async function updateStudentProfile(
 
 export async function updateStudentPrivateInfo(
   uid: string,
-  updates: { phone: string; kluStudentId: string; gender: GenderOption }
+  updates: { phone: string; kluStudentId: string; gender: GenderOption },
+  authMethod: 'google' | 'student_id' = 'google'
 ): Promise<void> {
   const path = `students/${uid}/private/info`;
+  const cleanId = clampStr(updates.kluStudentId.toUpperCase(), 20);
+  if (!/^[A-Z0-9]{6,20}$/.test(cleanId)) {
+    throw new Error('Enter a valid KL University Student ID (6–20 alphanumeric characters).');
+  }
+
+  const prevPrivSnap = await getDoc(doc(db, 'students', uid, 'private', 'info'));
+  const prevKluId = prevPrivSnap.exists()
+    ? String((prevPrivSnap.data() as StudentPrivate).kluStudentId || '').trim().toUpperCase()
+    : '';
+
+  if (cleanId !== prevKluId) {
+    const existingRegistry = await lookupStudentIdRegistry(cleanId);
+    if (existingRegistry && existingRegistry.ownerUid !== uid) {
+      throw new Error(
+        `Student ID "${cleanId}" is already linked to another KLU TRIBE profile.`
+      );
+    }
+  }
+
   try {
-    const cleanId = clampStr(updates.kluStudentId.toUpperCase(), 20);
     await updateDoc(doc(db, 'students', uid, 'private', 'info'), {
       phone: clampStr(updates.phone, 16),
       kluStudentId: cleanId,
@@ -261,6 +387,24 @@ export async function updateStudentPrivateInfo(
       maskedStudentId: maskStudentId(cleanId),
       updatedAt: serverTimestamp(),
     });
+
+    // Migrate studentIdRegistry entry if ID changed
+    try {
+      const pubSnap = await getDoc(doc(db, 'students', uid));
+      if (pubSnap.exists()) {
+        const pub = pubSnap.data() as StudentPublic;
+        if (prevKluId && prevKluId !== cleanId && /^[A-Z0-9]{6,20}$/.test(prevKluId)) {
+          const oldRegRef = doc(db, 'studentIdRegistry', prevKluId);
+          const oldRegSnap = await getDoc(oldRegRef);
+          if (oldRegSnap.exists() && (oldRegSnap.data() as StudentIdRegistryRecord).ownerUid === uid) {
+            await deleteDoc(oldRegRef);
+          }
+        }
+        await ensureStudentIdRegistryForProfile(pub, cleanId, authMethod);
+      }
+    } catch {
+      // Non-blocking registry migration
+    }
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
   }

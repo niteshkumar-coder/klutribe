@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Lock, Save } from 'lucide-react';
+import { auth, isStudentIdAuthEmail } from '../lib/firebase';
 import {
   fetchStudentPrivate,
   updateStudentPrivateInfo,
@@ -46,6 +47,7 @@ export function SettingsView({ me }: SettingsViewProps) {
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const msSinceLastCategoryChange = Date.now() - (me.categoryUpdatedAtMs || 0);
   const canSwitchCategory = msSinceLastCategoryChange >= NINETY_DAYS_MS || me.categoryUpdatedAtMs === 0;
@@ -81,6 +83,7 @@ export function SettingsView({ me }: SettingsViewProps) {
     e.preventDefault();
     setSaving(true);
     setMessage(null);
+    setErrorMessage(null);
     try {
       const categoryChanged = primaryCategory !== me.primaryCategory;
       await updateStudentProfile(me.uid, {
@@ -101,6 +104,8 @@ export function SettingsView({ me }: SettingsViewProps) {
       });
       setMessage('Profile & privacy settings saved.');
       setTimeout(() => setMessage(null), 3000);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Unable to save public settings.');
     } finally {
       setSaving(false);
     }
@@ -110,10 +115,14 @@ export function SettingsView({ me }: SettingsViewProps) {
     e.preventDefault();
     setSaving(true);
     setMessage(null);
+    setErrorMessage(null);
     try {
-      await updateStudentPrivateInfo(me.uid, { phone, kluStudentId, gender });
+      const authMethod = isStudentIdAuthEmail(auth.currentUser?.email) ? 'student_id' : 'google';
+      await updateStudentPrivateInfo(me.uid, { phone, kluStudentId, gender }, authMethod);
       setMessage('Private PII details updated securely.');
       setTimeout(() => setMessage(null), 3000);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Unable to update private details.');
     } finally {
       setSaving(false);
     }
@@ -131,6 +140,12 @@ export function SettingsView({ me }: SettingsViewProps) {
       {message && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-medium text-emerald-700">
           {message}
+        </div>
+      )}
+
+      {errorMessage && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-medium text-red-700">
+          {errorMessage}
         </div>
       )}
 

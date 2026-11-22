@@ -13,6 +13,7 @@ import { KluTribeLogo } from './KluTribeLogo';
 
 interface AuthModalProps {
   open: boolean;
+  initialStudentId?: string;
   signingIn: boolean;
   error: string | null;
   canRetryGoogle: boolean;
@@ -29,6 +30,7 @@ interface AuthModalProps {
 
 export function AuthModal({
   open,
+  initialStudentId = '',
   signingIn,
   error,
   canRetryGoogle,
@@ -39,7 +41,7 @@ export function AuthModal({
   onStudentIdAuth,
   onClearError,
 }: AuthModalProps) {
-  const [studentId, setStudentId] = useState('');
+  const [studentId, setStudentId] = useState(initialStudentId);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -49,8 +51,11 @@ export function AuthModal({
       setLocalError(null);
       setPassword('');
       setShowPassword(false);
+      if (initialStudentId) {
+        setStudentId(initialStudentId.trim().toUpperCase());
+      }
     }
-  }, [open]);
+  }, [open, initialStudentId]);
 
   useEffect(() => {
     if (!open) return;
@@ -227,7 +232,7 @@ export function AuthModal({
                 </button>
               </div>
               <p className="text-[11px] text-zinc-500">
-                First time here? Enter your Student ID &amp; set a password for KLU TRIBE to proceed directly to onboarding.
+                Already registered? Enter your University ID &amp; password to automatically open your existing profile. First time here? Set a password to register.
               </p>
             </div>
 

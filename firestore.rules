@@ -12,6 +12,10 @@ service cloud.firestore {
       return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
+    function isValidStudentIdKey(id) {
+      return id is string && id.size() >= 6 && id.size() <= 20 && id.matches('^[A-Z0-9]+$');
+    }
+
     function incoming() {
       return request.resource.data;
     }
@@ -249,6 +253,26 @@ service cloud.firestore {
         && data.createdAt is timestamp;
     }
 
+    function isValidStudentIdRegistry(data) {
+      return data.keys().hasAll([
+          'kluStudentId', 'ownerUid', 'memberNumber', 'fullName',
+          'branch', 'year', 'authMethod', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'kluStudentId', 'ownerUid', 'memberNumber', 'fullName',
+          'branch', 'year', 'authMethod', 'createdAt', 'updatedAt'
+        ])
+        && isValidStudentIdKey(data.kluStudentId)
+        && isValidId(data.ownerUid)
+        && data.memberNumber is string && data.memberNumber.size() >= 5 && data.memberNumber.size() <= 20 && data.memberNumber.matches('^KLU-[0-9]{6}$')
+        && data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 80
+        && data.branch in ['CSE', 'AI&DS', 'CS&IT', 'ECE', 'EEE', 'ME', 'CE', 'BT']
+        && data.year in ['1st Year', '2nd Year', '3rd Year', '4th Year']
+        && data.authMethod in ['google', 'student_id']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
     // --- Collection Rules ---
 
     // 1. Public Student Profiles (Zero PII)
@@ -313,6 +337,44 @@ service cloud.firestore {
         );
         allow delete: if isAdmin() && isValidId(studentId) && isValidId(docId);
       }
+    }
+
+    // 2B. Zero-PII University Student ID Uniqueness & Existing Profile Index
+    match /studentIdRegistry/{studentId} {
+      allow get: if isAuthenticatedMember() && isValidStudentIdKey(studentId);
+      allow list: if isAdmin();
+      allow create: if isAuthenticatedMember()
+        && isValidStudentIdKey(studentId)
+        && isValidStudentIdRegistry(incoming())
+        && incoming().kluStudentId == studentId
+        && (
+          (
+            incoming().ownerUid == request.auth.uid
+            && existsAfter(/databases/$(database)/documents/students/$(request.auth.uid))
+          ) || (
+            isAdmin()
+            && exists(/databases/$(database)/documents/students/$(incoming().ownerUid))
+          )
+        )
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isSignedIn()
+        && isValidStudentIdKey(studentId)
+        && isValidStudentIdRegistry(incoming())
+        && incoming().kluStudentId == studentId
+        && incoming().ownerUid == existing().ownerUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (
+            isAuthenticatedMember()
+            && existing().ownerUid == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'branch', 'year', 'authMethod', 'updatedAt'])
+          ) || isAdmin()
+        );
+      allow delete: if isValidStudentIdKey(studentId) && isSignedIn() && (
+        (isAuthenticatedMember() && existing().ownerUid == request.auth.uid) || isAdmin()
+      );
     }
 
     // 3. Admins

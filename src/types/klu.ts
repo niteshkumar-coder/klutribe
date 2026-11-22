@@ -60,6 +60,18 @@ export interface StudentPrivate {
   updatedAt?: Timestamp;
 }
 
+export interface StudentIdRegistryRecord {
+  kluStudentId: string;
+  ownerUid: string;
+  memberNumber: string;
+  fullName: string;
+  branch: Branch;
+  year: AcademicYear;
+  authMethod: 'google' | 'student_id';
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
 export interface Connection {
   id: string;
   fromUid: string;

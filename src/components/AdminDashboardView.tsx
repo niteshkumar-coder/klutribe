@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Ban,
   Check,
@@ -20,6 +20,7 @@ import {
   adminSetStudentSuspension,
   adminSetStudentVerification,
   deleteIdea,
+  ensureStudentIdRegistryForProfile,
   exportStudentsToCsv,
   subscribeAdminReports,
   subscribeAllIdeasForAdmin,
@@ -115,12 +116,25 @@ export function AdminDashboardView({
     [allStudents]
   );
 
+  const syncedRegistryUidsRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     if (!isAuthorizedAdmin) return;
     const uids = studentUidsKey ? studentUidsKey.split(',') : [];
     const unsubPrivate = subscribeStudentPrivateInfos(uids, setPrivateMap);
     return () => unsubPrivate();
   }, [isAuthorizedAdmin, studentUidsKey]);
+
+  // Silently ensure pre-existing students have studentIdRegistry index docs
+  useEffect(() => {
+    if (!isAuthorizedAdmin || allStudents.length === 0) return;
+    allStudents.forEach((student) => {
+      const priv = privateMap[student.uid];
+      if (!priv?.kluStudentId || syncedRegistryUidsRef.current.has(student.uid)) return;
+      syncedRegistryUidsRef.current.add(student.uid);
+      void ensureStudentIdRegistryForProfile(student, priv.kluStudentId, 'google');
+    });
+  }, [isAuthorizedAdmin, allStudents, privateMap]);
 
   if (!isAuthorizedAdmin) {
     return (

@@ -1,6 +1,7 @@
-import { Component, useEffect, useState, type ReactNode } from 'react';
+import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
   getRedirectResult,
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -29,17 +30,24 @@ import {
 } from 'lucide-react';
 import {
   auth,
+  extractStudentIdFromAuthEmail,
   googleProvider,
   isSameOriginAuth,
+  isStudentIdAuthEmail,
   prewarmGooglePopup,
   studentIdToAuthEmail,
   testFirestoreConnection,
 } from './lib/firebase';
 import {
   checkIsAdmin,
+  ensureStudentIdRegistryForProfile,
+  fetchStudentPrivate,
+  fetchStudentProfile,
+  lookupStudentIdRegistry,
   subscribeCampusEvents,
   subscribeMyConnections,
   subscribeMyIdeas,
+  subscribeMyStudentProfile,
   subscribeMySubmittedOpportunities,
   subscribeOpportunities,
   subscribeProjects,
@@ -56,6 +64,7 @@ import {
   type ProjectTeam,
   type SkillExchange,
   type StartupIdea,
+  type StudentIdRegistryRecord,
   type StudentPublic,
 } from './types/klu';
 import { LandingPage } from './components/LandingPage';
@@ -63,6 +72,7 @@ import { AuthModal } from './components/AuthModal';
 import { KluTribeLogo } from './components/KluTribeLogo';
 import { PublicPassView } from './components/PublicPassView';
 import { OnboardingFlow } from './components/OnboardingFlow';
+import { ExistingStudentMatchView } from './components/ExistingStudentMatchView';
 import { DashboardHome } from './components/DashboardHome';
 import { TribePassCard } from './components/TribePassCard';
 import { NetworkView } from './components/NetworkView';
@@ -134,9 +144,20 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [prefillStudentId, setPrefillStudentId] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [authErrorCanRetry, setAuthErrorCanRetry] = useState(false);
   const [authErrorCanRedirect, setAuthErrorCanRedirect] = useState(false);
+
+  const [myProfile, setMyProfile] = useState<StudentPublic | null>(null);
+  const [myProfileLoaded, setMyProfileLoaded] = useState(false);
+  const [existingIdLookupDone, setExistingIdLookupDone] = useState(true);
+  const [existingStudentMatch, setExistingStudentMatch] = useState<{
+    registry: StudentIdRegistryRecord;
+    profile: StudentPublic | null;
+  } | null>(null);
+  const [switchingFromExisting, setSwitchingFromExisting] = useState(false);
+  const syncedOwnRegistryUidRef = useRef<string | null>(null);
 
   const [students, setStudents] = useState<StudentPublic[]>([]);
   const [studentsLoaded, setStudentsLoaded] = useState(false);
@@ -216,6 +237,10 @@ export default function App() {
   // Subscribe to workspace collections only after auth is ready & user signed in
   useEffect(() => {
     if (!authReady || !user) {
+      setMyProfile(null);
+      setMyProfileLoaded(false);
+      setExistingStudentMatch(null);
+      setExistingIdLookupDone(true);
       setStudents([]);
       setStudentsLoaded(false);
       setConnections([]);
@@ -229,6 +254,11 @@ export default function App() {
       return;
     }
 
+    setMyProfileLoaded(false);
+    const unsubMyProfile = subscribeMyStudentProfile(user.uid, (profile) => {
+      setMyProfile(profile);
+      setMyProfileLoaded(true);
+    });
     const unsubStudents = subscribePublicStudents((rows) => {
       setStudents(rows);
       setStudentsLoaded(true);
@@ -243,6 +273,7 @@ export default function App() {
     const unsubEvents = subscribeCampusEvents(setCampusEvents);
 
     return () => {
+      unsubMyProfile();
       unsubStudents();
       unsubConns();
       unsubIdeas();
@@ -254,6 +285,69 @@ export default function App() {
       unsubEvents();
     };
   }, [authReady, user]);
+
+  // Silently ensure returning students have their University ID registered in studentIdRegistry
+  useEffect(() => {
+    if (!user || !myProfile || syncedOwnRegistryUidRef.current === user.uid) return;
+    syncedOwnRegistryUidRef.current = user.uid;
+    const authMethod = isStudentIdAuthEmail(user.email) ? 'student_id' : 'google';
+    void fetchStudentPrivate(user.uid)
+      .then((priv) => {
+        if (priv?.kluStudentId) {
+          return ensureStudentIdRegistryForProfile(myProfile, priv.kluStudentId, authMethod);
+        }
+        return undefined;
+      })
+      .catch(() => null);
+  }, [user, myProfile]);
+
+  // If a student signed in using a University Student ID that already belongs to an existing profile,
+  // automatically look up and display the old profile instead of creating a duplicate.
+  useEffect(() => {
+    if (!user || !myProfileLoaded) return;
+    if (myProfile || !isStudentIdAuthEmail(user.email)) {
+      setExistingStudentMatch(null);
+      setExistingIdLookupDone(true);
+      return;
+    }
+
+    const enteredId = extractStudentIdFromAuthEmail(user.email);
+    if (!enteredId) {
+      setExistingStudentMatch(null);
+      setExistingIdLookupDone(true);
+      return;
+    }
+
+    let cancelled = false;
+    setExistingIdLookupDone(false);
+    lookupStudentIdRegistry(enteredId)
+      .then(async (reg) => {
+        if (cancelled) return;
+        if (reg && reg.ownerUid !== user.uid) {
+          let profile: StudentPublic | null = null;
+          try {
+            profile = await fetchStudentProfile(reg.ownerUid);
+          } catch {
+            profile = null;
+          }
+          if (!cancelled) {
+            setExistingStudentMatch({ registry: reg, profile });
+          }
+        } else {
+          setExistingStudentMatch(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setExistingStudentMatch(null);
+      })
+      .finally(() => {
+        if (!cancelled) setExistingIdLookupDone(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, myProfile, myProfileLoaded]);
 
   const handleGoogleSignIn = async () => {
     if (signingIn) return;
@@ -390,7 +484,7 @@ export default function App() {
               : '';
           if (createCode === 'auth/email-already-in-use') {
             setAuthError(
-              `Incorrect password for Student ID "${studentId}". Please check your password and try again.`
+              `Existing profile found for University ID "${studentId}". Please enter the password you created earlier to open your old profile.`
             );
           } else if (createCode === 'auth/weak-password') {
             setAuthError('Password is too weak. Use at least 6 characters.');
@@ -410,7 +504,7 @@ export default function App() {
       }
       if (signInCode === 'auth/wrong-password') {
         setAuthError(
-          `Incorrect password for Student ID "${studentId}". Please check your password and try again.`
+          `Existing profile found for University ID "${studentId}". Please enter the password you created earlier to open your old profile.`
         );
       } else if (signInCode === 'auth/too-many-requests') {
         setAuthError('Too many failed attempts. Please wait a minute and try again.');
@@ -430,10 +524,45 @@ export default function App() {
     }
   };
 
-  const handleSignOut = async () => {
+  const cleanupTemporaryEmptyStudentIdAuth = async (deleteIfTemporary: boolean) => {
+    const current = auth.currentUser;
+    if (deleteIfTemporary && current && !myProfile && isStudentIdAuthEmail(current.email)) {
+      try {
+        await deleteUser(current);
+        return;
+      } catch {
+        // Fallback to signOut if recent-login check blocks deletion
+      }
+    }
     await signOut(auth);
+  };
+
+  const handleSignOut = async () => {
+    await cleanupTemporaryEmptyStudentIdAuth(Boolean(existingStudentMatch));
+    setExistingStudentMatch(null);
     setActiveTab('dashboard');
     setShowLanding(false);
+  };
+
+  const handleOpenExistingAccount = async (registry: StudentIdRegistryRecord) => {
+    if (switchingFromExisting) return;
+    setSwitchingFromExisting(true);
+    try {
+      await cleanupTemporaryEmptyStudentIdAuth(true);
+      setExistingStudentMatch(null);
+      setShowLanding(false);
+      if (registry.authMethod === 'student_id') {
+        setPrefillStudentId(registry.kluStudentId);
+        setAuthError(null);
+        setAuthModalOpen(true);
+      } else {
+        setPrefillStudentId('');
+        setAuthModalOpen(true);
+        await handleGoogleSignIn();
+      }
+    } finally {
+      setSwitchingFromExisting(false);
+    }
   };
 
   if (publicPassParam) {
@@ -458,7 +587,7 @@ export default function App() {
     );
   }
 
-  const me = user ? students.find((s) => s.uid === user.uid) || null : null;
+  const me = user ? myProfile || students.find((s) => s.uid === user.uid) || null : null;
 
   // Landing Page when logged out or explicitly visiting landing
   if (!user || showLanding) {
@@ -508,12 +637,14 @@ export default function App() {
         )}
         <AuthModal
           open={authModalOpen}
+          initialStudentId={prefillStudentId}
           signingIn={signingIn}
           error={authError}
           canRetryGoogle={authErrorCanRetry}
           canRedirectGoogle={authErrorCanRedirect}
           onClose={() => {
             setAuthModalOpen(false);
+            setPrefillStudentId('');
             setAuthError(null);
             setAuthErrorCanRetry(false);
             setAuthErrorCanRedirect(false);
@@ -535,6 +666,7 @@ export default function App() {
             if (user) {
               setShowLanding(false);
             } else {
+              setPrefillStudentId('');
               setAuthError(null);
               setAuthErrorCanRetry(false);
               setAuthErrorCanRedirect(false);
@@ -546,11 +678,26 @@ export default function App() {
     );
   }
 
-  if (!studentsLoaded) {
+  if (!myProfileLoaded || !studentsLoaded || !existingIdLookupDone) {
     return (
       <div className="min-h-screen bg-[#F4F5F7] text-zinc-600 flex items-center justify-center text-sm font-medium">
         Syncing your KLU TRIBE workspace...
       </div>
+    );
+  }
+
+  // Automatic existing profile screen when a previously-registered University ID is entered again
+  if (!me && existingStudentMatch) {
+    return (
+      <ErrorBoundary>
+        <ExistingStudentMatchView
+          registry={existingStudentMatch.registry}
+          existingProfile={existingStudentMatch.profile}
+          switching={switchingFromExisting}
+          onContinueOriginalAuth={() => handleOpenExistingAccount(existingStudentMatch.registry)}
+          onSignOutAndRetry={handleSignOut}
+        />
+      </ErrorBoundary>
     );
   }
 
@@ -564,6 +711,7 @@ export default function App() {
           displayName={user.displayName || ''}
           onComplete={() => setActiveTab('pass')}
           onSignOut={handleSignOut}
+          onOpenExistingAccount={handleOpenExistingAccount}
         />
       </ErrorBoundary>
     );
