@@ -40,7 +40,7 @@ import privacyShieldImg from '../assets/images/privacy_crimson_shield_campus_179
 interface LandingPageProps {
   isSignedIn: boolean;
   hasProfile: boolean;
-  onPrimaryAction: () => void;
+  onPrimaryAction: (mode?: 'signup' | 'login') => void;
   signingIn: boolean;
 }
 
@@ -209,7 +209,7 @@ export function LandingPage({
           <div className="flex items-center gap-2.5 shrink-0">
             <button
               type="button"
-              onClick={onPrimaryAction}
+              onClick={() => onPrimaryAction('login')}
               disabled={signingIn}
               className="hidden sm:inline-flex items-center rounded-xl border border-zinc-300 bg-white px-4 py-2 text-xs font-semibold text-zinc-900 hover:border-zinc-400 hover:bg-zinc-50 transition-colors disabled:opacity-60 whitespace-nowrap shrink-0"
             >
@@ -217,7 +217,7 @@ export function LandingPage({
             </button>
             <button
               type="button"
-              onClick={onPrimaryAction}
+              onClick={() => onPrimaryAction('signup')}
               disabled={signingIn}
               className="inline-flex items-center gap-1.5 rounded-xl bg-[#C8102E] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#A30D25] transition-colors disabled:opacity-60 whitespace-nowrap shrink-0"
             >
@@ -281,7 +281,7 @@ export function LandingPage({
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 <button
                   type="button"
-                  onClick={onPrimaryAction}
+                  onClick={() => onPrimaryAction('signup')}
                   disabled={signingIn}
                   className="inline-flex items-center gap-2 rounded-xl bg-[#C8102E] px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#A30D25] transition-colors disabled:opacity-60 whitespace-nowrap shrink-0"
                 >
@@ -425,7 +425,7 @@ export function LandingPage({
 
               <button
                 type="button"
-                onClick={onPrimaryAction}
+                onClick={() => onPrimaryAction('signup')}
                 disabled={signingIn}
                 className="group rounded-2xl border border-zinc-100 bg-white p-5 text-center space-y-3 shadow-xs hover:border-rose-200 hover:shadow-md transition-all disabled:opacity-60"
               >
@@ -440,7 +440,7 @@ export function LandingPage({
 
               <button
                 type="button"
-                onClick={onPrimaryAction}
+                onClick={() => onPrimaryAction('signup')}
                 disabled={signingIn}
                 className="group rounded-2xl border border-zinc-100 bg-white p-5 text-center space-y-3 shadow-xs hover:border-rose-200 hover:shadow-md transition-all disabled:opacity-60"
               >
@@ -455,7 +455,7 @@ export function LandingPage({
 
               <button
                 type="button"
-                onClick={onPrimaryAction}
+                onClick={() => onPrimaryAction('signup')}
                 disabled={signingIn}
                 className="group rounded-2xl border border-zinc-100 bg-white p-5 text-center space-y-3 shadow-xs hover:border-rose-200 hover:shadow-md transition-all disabled:opacity-60"
               >
@@ -803,7 +803,7 @@ export function LandingPage({
               <div className="flex flex-wrap items-center gap-3 shrink-0">
                 <button
                   type="button"
-                  onClick={onPrimaryAction}
+                  onClick={() => onPrimaryAction('signup')}
                   disabled={signingIn}
                   className="inline-flex items-center gap-2 rounded-xl bg-[#C8102E] px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#A30D25] transition-colors whitespace-nowrap shrink-0"
                 >

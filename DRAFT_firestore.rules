@@ -28,19 +28,34 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.email_verified == true;
     }
 
+    function isStudentIdAccount() {
+      return isSignedIn()
+        && request.auth.token.firebase.sign_in_provider == 'password'
+        && request.auth.token.email is string
+        && request.auth.token.email.matches('^[a-z0-9]{6,20}@student\\.klutribe\\.in$');
+    }
+
+    function isAuthenticatedMember() {
+      return isVerifiedEmail() || isStudentIdAccount();
+    }
+
     function isOwner(uid) {
       return isSignedIn() && request.auth.uid == uid;
     }
 
     function isAdmin() {
-      return isVerifiedEmail() && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        request.auth.token.email == 'niteshkumar9128ku@gmail.com'
-      );
+      return isVerifiedEmail() && request.auth.token.email == 'niteshkumar9128ku@gmail.com';
     }
 
     function isValidStringList(arr, maxLen) {
       return arr is list && arr.size() <= maxLen && (arr.size() == 0 || (arr[0] is string && arr[0].size() <= 60));
+    }
+
+    function isSelfUidToggle(oldList, newList, uid) {
+      return (
+        (newList.hasAll(oldList) && newList.size() == oldList.size() + 1 && (uid in newList) && !(uid in oldList)) ||
+        (oldList.hasAll(newList) && oldList.size() == newList.size() + 1 && (uid in oldList) && !(uid in newList))
+      );
     }
 
     // --- Validation Blueprints ---
@@ -240,7 +255,7 @@ service cloud.firestore {
     match /students/{studentId} {
       allow get: if isValidId(studentId) && (resource.data.isSuspended == false || isOwner(studentId) || isAdmin());
       allow list: if resource.data.isSuspended == false || isAdmin();
-      allow create: if isVerifiedEmail()
+      allow create: if isAuthenticatedMember()
         && isValidId(studentId)
         && isOwner(studentId)
         && isValidStudentPublic(incoming())
@@ -251,7 +266,7 @@ service cloud.firestore {
         && incoming().updatedAt == request.time;
       allow update: if isSignedIn() && isValidStudentPublic(incoming()) && (
         (
-          isVerifiedEmail()
+          isAuthenticatedMember()
           && isOwner(studentId)
           && !existing().isSuspended
           && incoming().uid == existing().uid
@@ -281,7 +296,7 @@ service cloud.firestore {
       match /private/{docId} {
         allow get: if isValidId(studentId) && isValidId(docId) && (isOwner(studentId) || isAdmin());
         allow list: if isOwner(studentId) || isAdmin();
-        allow create: if isVerifiedEmail()
+        allow create: if isAuthenticatedMember()
           && isValidId(studentId) && isValidId(docId)
           && isOwner(studentId)
           && isValidStudentPrivate(incoming())
@@ -289,7 +304,7 @@ service cloud.firestore {
           && incoming().createdAt == request.time
           && incoming().updatedAt == request.time;
         allow update: if isSignedIn() && isValidStudentPrivate(incoming()) && (
-          isVerifiedEmail()
+          isAuthenticatedMember()
           && isOwner(studentId)
           && incoming().uid == existing().uid
           && incoming().createdAt == existing().createdAt
@@ -312,7 +327,7 @@ service cloud.firestore {
     match /connections/{connectionId} {
       allow get: if isValidId(connectionId) && isSignedIn() && (request.auth.uid in resource.data.participantUids || isAdmin());
       allow list: if isSignedIn() && (request.auth.uid in resource.data.participantUids || isAdmin());
-      allow create: if isVerifiedEmail()
+      allow create: if isAuthenticatedMember()
         && isValidId(connectionId)
         && isValidConnection(incoming())
         && incoming().fromUid == request.auth.uid
@@ -323,7 +338,7 @@ service cloud.firestore {
         && incoming().updatedAt == request.time;
       allow update: if isSignedIn() && isValidConnection(incoming()) && (
         (
-          isVerifiedEmail()
+          isAuthenticatedMember()
           && request.auth.uid == existing().toUid
           && existing().status == 'pending'
           && incoming().status in ['accepted', 'declined']
@@ -343,7 +358,7 @@ service cloud.firestore {
           && request.auth.uid in get(/databases/$(database)/documents/connections/$(connectionId)).data.participantUids;
         allow list: if isSignedIn()
           && request.auth.uid in get(/databases/$(database)/documents/connections/$(connectionId)).data.participantUids;
-        allow create: if isVerifiedEmail()
+        allow create: if isAuthenticatedMember()
           && isValidId(connectionId) && isValidId(messageId)
           && isValidMessage(incoming())
           && incoming().senderUid == request.auth.uid
@@ -358,7 +373,7 @@ service cloud.firestore {
     match /ideas/{ideaId} {
       allow get: if isValidId(ideaId) && (resource.data.visibility == 'public' || (isSignedIn() && resource.data.authorUid == request.auth.uid) || isAdmin());
       allow list: if resource.data.visibility == 'public' || (isSignedIn() && resource.data.authorUid == request.auth.uid) || isAdmin();
-      allow create: if isVerifiedEmail()
+      allow create: if isAuthenticatedMember()
         && isValidId(ideaId)
         && isValidIdea(incoming())
         && incoming().authorUid == request.auth.uid
@@ -367,19 +382,20 @@ service cloud.firestore {
         && incoming().updatedAt == request.time;
       allow update: if isSignedIn() && isValidIdea(incoming()) && (
         (
-          isVerifiedEmail()
+          isAuthenticatedMember()
           && existing().authorUid == request.auth.uid
           && incoming().authorUid == existing().authorUid
           && incoming().createdAt == existing().createdAt
           && incoming().updatedAt == request.time
           && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'problem', 'solution', 'stage', 'requiredSkills', 'rolesNeeded', 'visibility', 'updatedAt'])
         ) || (
-          isVerifiedEmail()
+          isAuthenticatedMember()
           && existing().visibility == 'public'
           && incoming().authorUid == existing().authorUid
           && incoming().createdAt == existing().createdAt
           && incoming().updatedAt == request.time
           && incoming().diff(existing()).affectedKeys().hasOnly(['interestedUids', 'updatedAt'])
+          && isSelfUidToggle(existing().interestedUids, incoming().interestedUids, request.auth.uid)
         ) || isAdmin()
       );
       allow delete: if isValidId(ideaId) && isSignedIn() && (existing().authorUid == request.auth.uid || isAdmin());
@@ -389,7 +405,7 @@ service cloud.firestore {
     match /skillExchanges/{exchangeId} {
       allow get: if isValidId(exchangeId) && (resource.data.status in ['open', 'matched'] || (isSignedIn() && resource.data.authorUid == request.auth.uid) || isAdmin());
       allow list: if resource.data.status in ['open', 'matched'] || (isSignedIn() && resource.data.authorUid == request.auth.uid) || isAdmin();
-      allow create: if isVerifiedEmail()
+      allow create: if isAuthenticatedMember()
         && isValidId(exchangeId)
         && isValidSkillExchange(incoming())
         && incoming().authorUid == request.auth.uid
@@ -399,7 +415,7 @@ service cloud.firestore {
         && incoming().updatedAt == request.time;
       allow update: if isSignedIn() && isValidSkillExchange(incoming()) && (
         (
-          isVerifiedEmail()
+          isAuthenticatedMember()
           && existing().authorUid == request.auth.uid
           && incoming().authorUid == existing().authorUid
           && incoming().createdAt == existing().createdAt
@@ -414,7 +430,7 @@ service cloud.firestore {
     match /projects/{projectId} {
       allow get: if isValidId(projectId) && (resource.data.status in ['recruiting', 'active', 'completed'] || isAdmin());
       allow list: if resource.data.status in ['recruiting', 'active', 'completed'] || isAdmin();
-      allow create: if isVerifiedEmail()
+      allow create: if isAuthenticatedMember()
         && isValidId(projectId)
         && isValidProject(incoming())
         && incoming().authorUid == request.auth.uid
@@ -424,19 +440,20 @@ service cloud.firestore {
         && incoming().updatedAt == request.time;
       allow update: if isSignedIn() && isValidProject(incoming()) && (
         (
-          isVerifiedEmail()
+          isAuthenticatedMember()
           && existing().authorUid == request.auth.uid
           && incoming().authorUid == existing().authorUid
           && incoming().createdAt == existing().createdAt
           && incoming().updatedAt == request.time
           && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'techStack', 'openRoles', 'githubUrl', 'portfolioUrl', 'isHackathonTeam', 'memberUids', 'status', 'updatedAt'])
         ) || (
-          isVerifiedEmail()
+          isAuthenticatedMember()
           && existing().status == 'recruiting'
           && incoming().authorUid == existing().authorUid
           && incoming().createdAt == existing().createdAt
           && incoming().updatedAt == request.time
           && incoming().diff(existing()).affectedKeys().hasOnly(['memberUids', 'updatedAt'])
+          && isSelfUidToggle(existing().memberUids, incoming().memberUids, request.auth.uid)
         ) || isAdmin()
       );
       allow delete: if isValidId(projectId) && isSignedIn() && (existing().authorUid == request.auth.uid || isAdmin());
@@ -446,7 +463,7 @@ service cloud.firestore {
     match /opportunities/{opportunityId} {
       allow get: if isValidId(opportunityId) && (resource.data.approvalStatus == 'approved' || (isSignedIn() && resource.data.submittedByUid == request.auth.uid) || isAdmin());
       allow list: if resource.data.approvalStatus == 'approved' || (isSignedIn() && resource.data.submittedByUid == request.auth.uid) || isAdmin();
-      allow create: if isVerifiedEmail()
+      allow create: if isAuthenticatedMember()
         && isValidId(opportunityId)
         && isValidOpportunity(incoming())
         && incoming().submittedByUid == request.auth.uid
@@ -467,7 +484,7 @@ service cloud.firestore {
     match /campusEvents/{eventId} {
       allow get: if isValidId(eventId) && (resource.data.section in ['Samyak', 'Surabhi', 'Clubs', 'Sports', 'Events', 'Achievements', 'Weekend'] || isAdmin());
       allow list: if resource.data.section in ['Samyak', 'Surabhi', 'Clubs', 'Sports', 'Events', 'Achievements', 'Weekend'] || isAdmin();
-      allow create: if isVerifiedEmail()
+      allow create: if isAuthenticatedMember()
         && isValidId(eventId)
         && isValidCampusEvent(incoming())
         && incoming().createdByUid == request.auth.uid
@@ -476,11 +493,12 @@ service cloud.firestore {
         && incoming().updatedAt == request.time;
       allow update: if isSignedIn() && isValidCampusEvent(incoming()) && (
         (
-          isVerifiedEmail()
+          isAuthenticatedMember()
           && incoming().createdByUid == existing().createdByUid
           && incoming().createdAt == existing().createdAt
           && incoming().updatedAt == request.time
           && incoming().diff(existing()).affectedKeys().hasOnly(['attendeeUids', 'updatedAt'])
+          && isSelfUidToggle(existing().attendeeUids, incoming().attendeeUids, request.auth.uid)
         ) || isAdmin()
       );
       allow delete: if isValidId(eventId) && isAdmin();
@@ -490,7 +508,7 @@ service cloud.firestore {
     match /reports/{reportId} {
       allow get: if isValidId(reportId) && isSignedIn() && (resource.data.reporterUid == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (resource.data.reporterUid == request.auth.uid || isAdmin());
-      allow create: if isVerifiedEmail()
+      allow create: if isAuthenticatedMember()
         && isValidId(reportId)
         && isValidReport(incoming())
         && incoming().reporterUid == request.auth.uid

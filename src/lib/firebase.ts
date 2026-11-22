@@ -31,6 +31,30 @@ type AuthWithResolver = typeof auth & {
   };
 };
 
+export const STUDENT_AUTH_DOMAIN = 'student.klutribe.in';
+
+export function normalizeStudentId(rawId: string): string {
+  return rawId.trim().toUpperCase();
+}
+
+export function isValidStudentIdFormat(rawId: string): boolean {
+  return /^[a-zA-Z0-9]{6,20}$/.test(rawId.trim());
+}
+
+export function studentIdToAuthEmail(studentId: string): string {
+  return `${studentId.trim().toLowerCase()}@${STUDENT_AUTH_DOMAIN}`;
+}
+
+export function isStudentIdAuthEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return email.trim().toLowerCase().endsWith(`@${STUDENT_AUTH_DOMAIN}`);
+}
+
+export function extractStudentIdFromAuthEmail(email: string | null | undefined): string {
+  if (!isStudentIdAuthEmail(email)) return '';
+  return (email || '').trim().split('@')[0].toUpperCase();
+}
+
 export function prewarmGooglePopup(): void {
   if (typeof window === 'undefined') return;
   const resolver = (auth as AuthWithResolver)._popupRedirectResolver;

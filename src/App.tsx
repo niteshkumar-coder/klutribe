@@ -1,7 +1,9 @@
 import { Component, useEffect, useState, type ReactNode } from 'react';
 import {
+  createUserWithEmailAndPassword,
   getRedirectResult,
   onAuthStateChanged,
+  signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
   signOut,
@@ -30,6 +32,7 @@ import {
   googleProvider,
   isSameOriginAuth,
   prewarmGooglePopup,
+  studentIdToAuthEmail,
   testFirestoreConnection,
 } from './lib/firebase';
 import {
@@ -56,6 +59,7 @@ import {
   type StudentPublic,
 } from './types/klu';
 import { LandingPage } from './components/LandingPage';
+import { AuthModal } from './components/AuthModal';
 import { KluTribeLogo } from './components/KluTribeLogo';
 import { PublicPassView } from './components/PublicPassView';
 import { OnboardingFlow } from './components/OnboardingFlow';
@@ -129,6 +133,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authErrorCanRetry, setAuthErrorCanRetry] = useState(false);
   const [authErrorCanRedirect, setAuthErrorCanRedirect] = useState(false);
@@ -260,6 +265,7 @@ export default function App() {
     setAuthErrorCanRedirect(false);
     try {
       await popupPromise;
+      setAuthModalOpen(false);
       setShowLanding(false);
     } catch (err) {
       const code =
@@ -346,6 +352,84 @@ export default function App() {
     }
   };
 
+  const handleStudentIdAuth = async ({
+    studentId,
+    password,
+  }: {
+    studentId: string;
+    password: string;
+  }) => {
+    if (signingIn) return;
+    setSigningIn(true);
+    setAuthError(null);
+    setAuthErrorCanRetry(false);
+    setAuthErrorCanRedirect(false);
+    const authEmail = studentIdToAuthEmail(studentId);
+    try {
+      await signInWithEmailAndPassword(auth, authEmail, password);
+      setAuthModalOpen(false);
+      setShowLanding(false);
+    } catch (signInErr) {
+      const signInCode =
+        typeof signInErr === 'object' && signInErr !== null && 'code' in signInErr
+          ? String((signInErr as { code?: unknown }).code)
+          : '';
+      if (
+        signInCode === 'auth/invalid-credential' ||
+        signInCode === 'auth/user-not-found'
+      ) {
+        try {
+          await createUserWithEmailAndPassword(auth, authEmail, password);
+          setAuthModalOpen(false);
+          setShowLanding(false);
+          return;
+        } catch (createErr) {
+          const createCode =
+            typeof createErr === 'object' && createErr !== null && 'code' in createErr
+              ? String((createErr as { code?: unknown }).code)
+              : '';
+          if (createCode === 'auth/email-already-in-use') {
+            setAuthError(
+              `Incorrect password for Student ID "${studentId}". Please check your password and try again.`
+            );
+          } else if (createCode === 'auth/weak-password') {
+            setAuthError('Password is too weak. Use at least 6 characters.');
+          } else if (createCode === 'auth/operation-not-allowed') {
+            setAuthError(
+              'University ID & Password login is not enabled yet in Firebase Console. Enable Email/Password under Firebase Console → Authentication → Sign-in method, or use Direct with Google below.'
+            );
+          } else {
+            setAuthError(
+              createErr instanceof Error
+                ? createErr.message
+                : 'Unable to create Student ID account.'
+            );
+          }
+          return;
+        }
+      }
+      if (signInCode === 'auth/wrong-password') {
+        setAuthError(
+          `Incorrect password for Student ID "${studentId}". Please check your password and try again.`
+        );
+      } else if (signInCode === 'auth/too-many-requests') {
+        setAuthError('Too many failed attempts. Please wait a minute and try again.');
+      } else if (signInCode === 'auth/operation-not-allowed') {
+        setAuthError(
+          'University ID & Password login is not enabled yet in Firebase Console. Enable Email/Password under Firebase Console → Authentication → Sign-in method, or use Direct with Google below.'
+        );
+      } else {
+        setAuthError(
+          signInErr instanceof Error
+            ? signInErr.message
+            : 'Unable to authenticate with Student ID.'
+        );
+      }
+    } finally {
+      setSigningIn(false);
+    }
+  };
+
   const handleSignOut = async () => {
     await signOut(auth);
     setActiveTab('dashboard');
@@ -380,7 +464,7 @@ export default function App() {
   if (!user || showLanding) {
     return (
       <ErrorBoundary>
-        {authError && (
+        {authError && !authModalOpen && (
           <div className="fixed bottom-4 right-4 z-50 flex max-w-md items-start gap-3 rounded-2xl border border-red-200 bg-white px-4 py-3 text-xs text-zinc-800 shadow-xl">
             <div className="flex-1 space-y-2">
               <p className="font-medium text-red-700 leading-relaxed">{authError}</p>
@@ -422,6 +506,27 @@ export default function App() {
             </button>
           </div>
         )}
+        <AuthModal
+          open={authModalOpen}
+          signingIn={signingIn}
+          error={authError}
+          canRetryGoogle={authErrorCanRetry}
+          canRedirectGoogle={authErrorCanRedirect}
+          onClose={() => {
+            setAuthModalOpen(false);
+            setAuthError(null);
+            setAuthErrorCanRetry(false);
+            setAuthErrorCanRedirect(false);
+          }}
+          onGoogleSignIn={handleGoogleSignIn}
+          onGoogleRedirectFallback={handleGoogleRedirectFallback}
+          onStudentIdAuth={handleStudentIdAuth}
+          onClearError={() => {
+            setAuthError(null);
+            setAuthErrorCanRetry(false);
+            setAuthErrorCanRedirect(false);
+          }}
+        />
         <LandingPage
           isSignedIn={Boolean(user)}
           hasProfile={Boolean(me)}
@@ -430,7 +535,10 @@ export default function App() {
             if (user) {
               setShowLanding(false);
             } else {
-              handleGoogleSignIn();
+              setAuthError(null);
+              setAuthErrorCanRetry(false);
+              setAuthErrorCanRedirect(false);
+              setAuthModalOpen(true);
             }
           }}
         />
